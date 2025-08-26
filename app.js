@@ -14,64 +14,98 @@
 
   // Statistics tracking system with shared session storage
   const statsManager = {
-    sessionId: localStorage.getItem('beerCertSessionId') || 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    binId: '67703ca6e41b4d34e4624b75',
+    apiKey: '$2a$10$vNlSH7yXx5yrXdQ6ZRJsQO8BL1O5Oz4RyvUGkB7pDPKOeH0rNV0v2',
+    cache: null,
+    lastSync: 0,
+    syncInterval: 5000, // 5 seconds cache
     
     init() {
-      localStorage.setItem('beerCertSessionId', this.sessionId);
+      // Pre-load stats in background
+      this.syncStats();
+    },
+    
+    async syncStats() {
+      try {
+        const response = await fetch(`https://api.jsonbin.io/v3/b/${this.binId}`, {
+          headers: {
+            'X-Master-Key': this.apiKey
+          }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          this.cache = data.record || { totalAttempts: 0, beersEarned: 0, fails: 0 };
+          this.lastSync = Date.now();
+          console.log('📊 Stats synced:', this.cache);
+        }
+      } catch (e) {
+        console.warn('📊 Sync failed, using cache/local');
+        if (!this.cache) {
+          const data = localStorage.getItem('beerCertStats');
+          this.cache = data ? JSON.parse(data) : { totalAttempts: 0, beersEarned: 0, fails: 0 };
+        }
+      }
     },
     
     async getStats() {
-      try {
-        const response = await fetch(`https://api.jsonbin.io/v3/b/67703c59ad19ca34f8daf0b2`, {
-          headers: {
-            'X-Master-Key': '$2a$10$vNlSH7yXx5yrXdQ6ZRJsQO8BL1O5Oz4RyvUGkB7pDPKOeH0rNV0v2'
-          }
-        });
-        const data = await response.json();
-        return data.record || { totalAttempts: 0, beersEarned: 0, fails: 0 };
-      } catch (e) {
-        console.warn('Failed to fetch shared stats, using local fallback');
-        const data = localStorage.getItem('beerCertStats');
-        return data ? JSON.parse(data) : { totalAttempts: 0, beersEarned: 0, fails: 0 };
+      // Use cache if recent, otherwise sync
+      if (!this.cache || (Date.now() - this.lastSync) > this.syncInterval) {
+        await this.syncStats();
       }
+      return { ...this.cache };
     },
     
     async saveStats(stats) {
+      // Optimistic update - update cache immediately
+      this.cache = { ...stats };
+      localStorage.setItem('beerCertStats', JSON.stringify(stats));
+      
+      // Background save to cloud
+      this.saveToCloud(stats);
+    },
+    
+    async saveToCloud(stats) {
       try {
-        await fetch(`https://api.jsonbin.io/v3/b/67703c59ad19ca34f8daf0b2`, {
+        const response = await fetch(`https://api.jsonbin.io/v3/b/${this.binId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
-            'X-Master-Key': '$2a$10$vNlSH7yXx5yrXdQ6ZRJsQO8BL1O5Oz4RyvUGkB7pDPKOeH0rNV0v2'
+            'X-Master-Key': this.apiKey
           },
           body: JSON.stringify(stats)
         });
+        if (response.ok) {
+          console.log('📊 Stats saved to cloud:', stats);
+        }
       } catch (e) {
-        console.warn('Failed to save shared stats, saving locally');
-        localStorage.setItem('beerCertStats', JSON.stringify(stats));
+        console.warn('📊 Cloud save failed, keeping local');
       }
     },
     
-    async incrementAttempts() {
-      const stats = await this.getStats();
-      stats.totalAttempts++;
-      await this.saveStats(stats);
+    incrementAttempts() {
+      if (!this.cache) this.cache = { totalAttempts: 0, beersEarned: 0, fails: 0 };
+      const newStats = { ...this.cache };
+      newStats.totalAttempts++;
+      this.saveStats(newStats);
     },
     
-    async incrementBeers() {
-      const stats = await this.getStats();
-      stats.beersEarned++;
-      await this.saveStats(stats);
+    incrementBeers() {
+      if (!this.cache) this.cache = { totalAttempts: 0, beersEarned: 0, fails: 0 };
+      const newStats = { ...this.cache };
+      newStats.beersEarned++;
+      this.saveStats(newStats);
     },
     
-    async incrementFails() {
-      const stats = await this.getStats();
-      stats.fails++;
-      await this.saveStats(stats);
+    incrementFails() {
+      if (!this.cache) this.cache = { totalAttempts: 0, beersEarned: 0, fails: 0 };
+      const newStats = { ...this.cache };
+      newStats.fails++;
+      this.saveStats(newStats);
     },
     
     async reset() {
-      await this.saveStats({ totalAttempts: 0, beersEarned: 0, fails: 0 });
+      const resetStats = { totalAttempts: 0, beersEarned: 0, fails: 0 };
+      await this.saveStats(resetStats);
     }
   };
 
@@ -163,10 +197,10 @@
       status.textContent = 'Loading questions…';
     }
     container.querySelectorAll('.chip').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', () => {
         quizState.currentDifficulty = btn.dataset.diff;
         quizState.attemptsLeft = quizState.maxAttempts; // Reset attempts
-        await statsManager.incrementAttempts(); // Track new attempt
+        statsManager.incrementAttempts(); // Track new attempt (non-blocking)
         pickAndShowQuestion();
       });
     });
@@ -232,7 +266,7 @@
     }
   }
 
-  async function handleAnswer(btn, q) {
+  function handleAnswer(btn, q) {
     const all = Array.from(document.querySelectorAll('.choice'));
     all.forEach(b => b.disabled = true);
     const chosen = btn.getAttribute('data-answer');
@@ -243,7 +277,7 @@
       showResultOverlay('correct');
       triggerBeerCheersAnimation();
       triggerConfetti();
-      await statsManager.incrementBeers(); // Track successful beer earning
+      statsManager.incrementBeers(); // Track successful beer earning (non-blocking)
       showToast('Correct! You may now say "win" and fetch a beer.');
       setTimeout(() => {
         render(createStartView());
@@ -263,7 +297,7 @@
           pickAndShowQuestion();
         }, 1500);
       } else {
-        await statsManager.incrementFails(); // Track final failure
+        statsManager.incrementFails(); // Track final failure (non-blocking)
         showToast('All attempts used. Time to practice more before enjoying that cold drink!');
         showFinalFailAnimation();
         setTimeout(() => render(createStartView()), 2500);
