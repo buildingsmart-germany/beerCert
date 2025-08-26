@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BeerCert – Die ironischste Bier-Zertifizierung</title>
+    <meta name="description" content="BeerCert: Das spielerisch-ironische Quiz für wahre (und zukünftige) Bierkenner. Bestehe und gewinne... na ja, Ruhm und ein Bier!" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext y='50' x='6' font-size='48'%3E%F0%9F%8D%BA%3C/text%3E%3C/svg%3E" />
+    <!-- Tippy.js for nicer tooltips -->
+    <link rel="stylesheet" href="https://unpkg.com/tippy.js@6/themes/light.css" />
+  </head>
+  <body>
+    <div id="app">
+      <header class="app-header">
+        <div class="brand">
+          <span class="emoji">🍺</span>
+          <h1 class="title" data-tippy-content="Ja, eine echte Zertifizierung. So echt wie alkoholfreies IPA.">BeerCert</h1>
+        </div>
+        <p class="tagline">Die ironischste Bier-Zertifizierung des Planeten</p>
+      </header>
+
+      <main id="view-container" class="card">
+        <!-- Views werden von app.js ausgetauscht -->
+        <noscript>Bitte aktiviere JavaScript, um dich zu zertifizieren. Wir vertrauen dir. Einmal.</noscript>
+      </main>
+
+      <footer class="app-footer">
+        <span>© <span id="year"></span> BeerCert — Kein Jugendschutz verletzt.</span>
+      </footer>
+    </div>
+
+    <!-- Dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" integrity="sha256-4rK9qf0b0KxWb4Jf7oYkqgqXK7Gx7/8kqI7F7n9q5QM=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" integrity="sha256-lY7kA5R0R0b3A3xA0I0nVYb+Q0oQy1mQ0ZlF5C2D8vU=" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/@popperjs/core@2"></script>
+    <script src="https://unpkg.com/tippy.js@6"></script>
+
+    <!-- App -->
+    <script src="app.js"></script>
+  </body>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+  </html>
+
+
