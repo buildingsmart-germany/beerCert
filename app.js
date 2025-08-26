@@ -12,75 +12,161 @@
     currentView: 'start', // 'start' | 'question' | 'dashboard'
   };
 
-  // Statistics tracking system with shared session storage
+  // Statistics tracking system with robust cross-tab synchronization
   const statsManager = {
     storageKey: 'beerCertStats',
+    timestampKey: 'beerCertStatsTimestamp',
     cache: null,
+    lastUpdate: 0,
+    pollInterval: null,
     
     init() {
       // Load initial stats
       this.loadStats();
-      // Listen for changes from other tabs
+      
+      // Multiple sync mechanisms for maximum compatibility
+      
+      // 1. Storage event listener (works in most cases)
       window.addEventListener('storage', (e) => {
         if (e.key === this.storageKey) {
           this.loadStats();
-          console.log('📊 Stats updated from another tab:', this.cache);
+          console.log('📊 Stats updated via storage event:', this.cache);
         }
       });
+      
+      // 2. Polling fallback for browsers/environments where storage events don't work
+      this.pollInterval = setInterval(() => {
+        this.checkForUpdates();
+      }, 2000); // Check every 2 seconds
+      
+      // 3. Page visibility change sync (when user switches tabs)
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+          this.checkForUpdates();
+        }
+      });
+      
+      // 4. Focus event sync (when user clicks on tab)
+      window.addEventListener('focus', () => {
+        this.checkForUpdates();
+      });
+    },
+    
+    checkForUpdates() {
+      try {
+        const timestampStr = localStorage.getItem(this.timestampKey);
+        const timestamp = timestampStr ? parseInt(timestampStr) : 0;
+        
+        if (timestamp > this.lastUpdate) {
+          this.loadStats();
+          console.log('📊 Stats updated via polling:', this.cache);
+        }
+      } catch (e) {
+        console.warn('📊 Failed to check for updates');
+      }
     },
     
     loadStats() {
       try {
         const data = localStorage.getItem(this.storageKey);
+        const timestamp = localStorage.getItem(this.timestampKey);
+        
         this.cache = data ? JSON.parse(data) : { totalAttempts: 0, beersEarned: 0, fails: 0 };
+        this.lastUpdate = timestamp ? parseInt(timestamp) : Date.now();
+        
+        // Force UI update if dashboard is visible
+        if (quizState.currentView === 'dashboard') {
+          setTimeout(() => this.refreshDashboard(), 100);
+        }
       } catch (e) {
         console.warn('📊 Failed to load stats, using defaults');
         this.cache = { totalAttempts: 0, beersEarned: 0, fails: 0 };
+        this.lastUpdate = Date.now();
+      }
+    },
+    
+    refreshDashboard() {
+      const existingChart = document.getElementById('session-chart');
+      if (existingChart) {
+        generateChart(this.cache);
+        
+        // Update stat numbers
+        const statNumbers = document.querySelectorAll('.stat-number');
+        if (statNumbers.length >= 3) {
+          statNumbers[0].textContent = this.cache.totalAttempts;
+          statNumbers[1].textContent = this.cache.beersEarned;
+          statNumbers[2].textContent = this.cache.fails;
+        }
       }
     },
     
     getStats() {
+      // Always check for fresh data when requested
+      this.checkForUpdates();
       if (!this.cache) this.loadStats();
       return { ...this.cache };
     },
     
     saveStats(stats) {
-      this.cache = { ...stats };
-      localStorage.setItem(this.storageKey, JSON.stringify(stats));
-      console.log('📊 Stats saved:', this.cache);
+      const timestamp = Date.now();
       
-      // Broadcast to other tabs via storage event
-      window.dispatchEvent(new StorageEvent('storage', {
-        key: this.storageKey,
-        newValue: JSON.stringify(stats),
-        url: window.location.href
-      }));
+      this.cache = { ...stats };
+      this.lastUpdate = timestamp;
+      
+      // Save data and timestamp
+      localStorage.setItem(this.storageKey, JSON.stringify(stats));
+      localStorage.setItem(this.timestampKey, timestamp.toString());
+      
+      console.log('📊 Stats saved:', this.cache, 'at', new Date(timestamp).toLocaleTimeString());
+      
+      // Trigger storage event manually for better compatibility
+      try {
+        window.dispatchEvent(new StorageEvent('storage', {
+          key: this.storageKey,
+          newValue: JSON.stringify(stats),
+          oldValue: null,
+          url: window.location.href,
+          storageArea: localStorage
+        }));
+      } catch (e) {
+        console.warn('📊 Could not dispatch storage event');
+      }
     },
     
     incrementAttempts() {
-      if (!this.cache) this.loadStats();
-      const newStats = { ...this.cache };
+      const currentStats = this.getStats();
+      const newStats = { ...currentStats };
       newStats.totalAttempts++;
       this.saveStats(newStats);
+      console.log('📊 Incremented attempts:', newStats.totalAttempts);
     },
     
     incrementBeers() {
-      if (!this.cache) this.loadStats();
-      const newStats = { ...this.cache };
+      const currentStats = this.getStats();
+      const newStats = { ...currentStats };
       newStats.beersEarned++;
       this.saveStats(newStats);
+      console.log('📊 Incremented beers:', newStats.beersEarned);
     },
     
     incrementFails() {
-      if (!this.cache) this.loadStats();
-      const newStats = { ...this.cache };
+      const currentStats = this.getStats();
+      const newStats = { ...currentStats };
       newStats.fails++;
       this.saveStats(newStats);
+      console.log('📊 Incremented fails:', newStats.fails);
     },
     
     reset() {
       const resetStats = { totalAttempts: 0, beersEarned: 0, fails: 0 };
       this.saveStats(resetStats);
+      console.log('📊 Stats reset');
+    },
+    
+    destroy() {
+      if (this.pollInterval) {
+        clearInterval(this.pollInterval);
+      }
     }
   };
 
