@@ -14,98 +14,73 @@
 
   // Statistics tracking system with shared session storage
   const statsManager = {
-    binId: '67703ca6e41b4d34e4624b75',
-    apiKey: '$2a$10$vNlSH7yXx5yrXdQ6ZRJsQO8BL1O5Oz4RyvUGkB7pDPKOeH0rNV0v2',
+    storageKey: 'beerCertStats',
     cache: null,
-    lastSync: 0,
-    syncInterval: 5000, // 5 seconds cache
     
     init() {
-      // Pre-load stats in background
-      this.syncStats();
+      // Load initial stats
+      this.loadStats();
+      // Listen for changes from other tabs
+      window.addEventListener('storage', (e) => {
+        if (e.key === this.storageKey) {
+          this.loadStats();
+          console.log('📊 Stats updated from another tab:', this.cache);
+        }
+      });
     },
     
-    async syncStats() {
+    loadStats() {
       try {
-        const response = await fetch(`https://api.jsonbin.io/v3/b/${this.binId}`, {
-          headers: {
-            'X-Master-Key': this.apiKey
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          this.cache = data.record || { totalAttempts: 0, beersEarned: 0, fails: 0 };
-          this.lastSync = Date.now();
-          console.log('📊 Stats synced:', this.cache);
-        }
+        const data = localStorage.getItem(this.storageKey);
+        this.cache = data ? JSON.parse(data) : { totalAttempts: 0, beersEarned: 0, fails: 0 };
       } catch (e) {
-        console.warn('📊 Sync failed, using cache/local');
-        if (!this.cache) {
-          const data = localStorage.getItem('beerCertStats');
-          this.cache = data ? JSON.parse(data) : { totalAttempts: 0, beersEarned: 0, fails: 0 };
-        }
+        console.warn('📊 Failed to load stats, using defaults');
+        this.cache = { totalAttempts: 0, beersEarned: 0, fails: 0 };
       }
     },
     
-    async getStats() {
-      // Use cache if recent, otherwise sync
-      if (!this.cache || (Date.now() - this.lastSync) > this.syncInterval) {
-        await this.syncStats();
-      }
+    getStats() {
+      if (!this.cache) this.loadStats();
       return { ...this.cache };
     },
     
-    async saveStats(stats) {
-      // Optimistic update - update cache immediately
+    saveStats(stats) {
       this.cache = { ...stats };
-      localStorage.setItem('beerCertStats', JSON.stringify(stats));
+      localStorage.setItem(this.storageKey, JSON.stringify(stats));
+      console.log('📊 Stats saved:', this.cache);
       
-      // Background save to cloud
-      this.saveToCloud(stats);
-    },
-    
-    async saveToCloud(stats) {
-      try {
-        const response = await fetch(`https://api.jsonbin.io/v3/b/${this.binId}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Master-Key': this.apiKey
-          },
-          body: JSON.stringify(stats)
-        });
-        if (response.ok) {
-          console.log('📊 Stats saved to cloud:', stats);
-        }
-      } catch (e) {
-        console.warn('📊 Cloud save failed, keeping local');
-      }
+      // Broadcast to other tabs via storage event
+      window.dispatchEvent(new StorageEvent('storage', {
+        key: this.storageKey,
+        newValue: JSON.stringify(stats),
+        url: window.location.href
+      }));
     },
     
     incrementAttempts() {
-      if (!this.cache) this.cache = { totalAttempts: 0, beersEarned: 0, fails: 0 };
+      if (!this.cache) this.loadStats();
       const newStats = { ...this.cache };
       newStats.totalAttempts++;
       this.saveStats(newStats);
     },
     
     incrementBeers() {
-      if (!this.cache) this.cache = { totalAttempts: 0, beersEarned: 0, fails: 0 };
+      if (!this.cache) this.loadStats();
       const newStats = { ...this.cache };
       newStats.beersEarned++;
       this.saveStats(newStats);
     },
     
     incrementFails() {
-      if (!this.cache) this.cache = { totalAttempts: 0, beersEarned: 0, fails: 0 };
+      if (!this.cache) this.loadStats();
       const newStats = { ...this.cache };
       newStats.fails++;
       this.saveStats(newStats);
     },
     
-    async reset() {
+    reset() {
       const resetStats = { totalAttempts: 0, beersEarned: 0, fails: 0 };
-      await this.saveStats(resetStats);
+      this.saveStats(resetStats);
     }
   };
 
@@ -379,10 +354,10 @@
     }, 200);
   }
 
-  async function showDashboard() {
+  function showDashboard() {
     const container = document.createElement('section');
     container.className = 'section dashboard';
-    const stats = await statsManager.getStats();
+    const stats = statsManager.getStats();
     
     container.innerHTML = `
       <div>
@@ -433,9 +408,9 @@
       render(createStartView());
     });
     
-    container.querySelector('#reset-stats').addEventListener('click', async () => {
+    container.querySelector('#reset-stats').addEventListener('click', () => {
       if (confirm('Reset all session statistics? This cannot be undone.')) {
-        await statsManager.reset();
+        statsManager.reset();
         showDashboard(); // Refresh dashboard
         showToast('Statistics reset successfully!');
       }
