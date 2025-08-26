@@ -152,8 +152,9 @@
     const isCorrect = chosen === q.correct;
     if (isCorrect) {
       btn.classList.add('correct');
+      showResultOverlay('correct');
       triggerConfetti();
-      showToast('Correct! You may now say “win” and fetch a beer.');
+      showToast('Correct! You may now say "win" and fetch a beer.');
       setTimeout(() => {
         render(createStartView());
       }, 1100);
@@ -161,18 +162,36 @@
       btn.classList.add('wrong');
       const correctBtn = all.find(b => b.getAttribute('data-answer') === q.correct);
       if (correctBtn) correctBtn.classList.add('correct');
+      showResultOverlay('wrong');
       showToast('Oops! Maybe take BeerCert again. Or learn first, then drink.');
       setTimeout(() => render(createStartView()), 1500);
     }
   }
 
+  function showResultOverlay(type) {
+    const overlay = document.getElementById('result-overlay');
+    if (!overlay) return;
+    // Clear previous classes
+    overlay.className = 'result-overlay';
+    // Add new class to trigger animation
+    overlay.classList.add(type);
+    // Auto-remove after animation
+    setTimeout(() => {
+      overlay.className = 'result-overlay';
+    }, 800);
+  }
+
   function triggerConfetti() {
     if (typeof confetti !== 'function') return;
+    // Use theme-aware colors
+    const style = getComputedStyle(document.documentElement);
+    const brand = style.getPropertyValue('--brand').trim();
+    const accent = style.getPropertyValue('--accent').trim();
     confetti({
       particleCount: 120,
       spread: 70,
       origin: { y: 0.6 },
-      colors: ['#f5c451', '#7dd3fc', '#ffffff']
+      colors: [brand, accent, '#ffffff']
     });
   }
 
