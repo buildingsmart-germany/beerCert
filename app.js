@@ -624,6 +624,17 @@
 
   async function init() {
     try {
+      // Clear any old cache/service workers
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for(let registration of registrations) {
+            registration.unregister();
+          }
+        });
+      }
+      
+      console.log('🍺 BeerCert initializing - version:', Date.now());
+      
       applyThemeFromPrefs();
       statsManager.init();
       render(createStartView());
