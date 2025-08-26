@@ -149,7 +149,7 @@ button:not(.choice):active { transform: translateY(0); box-shadow: 0 2px 8px var
   left: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 1000;
+  z-index: -1;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s ease;

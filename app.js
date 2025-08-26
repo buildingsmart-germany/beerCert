@@ -187,12 +187,25 @@
     const style = getComputedStyle(document.documentElement);
     const brand = style.getPropertyValue('--brand').trim();
     const accent = style.getPropertyValue('--accent').trim();
+    // Bigger, more prominent confetti burst
     confetti({
-      particleCount: 120,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: [brand, accent, '#ffffff']
+      particleCount: 200,
+      spread: 85,
+      origin: { y: 0.5 },
+      scalar: 1.5,
+      shapes: ['circle', 'square'],
+      colors: [brand, accent, '#ffffff', '#ffd700']
     });
+    // Second burst for extra effect
+    setTimeout(() => {
+      confetti({
+        particleCount: 100,
+        spread: 60,
+        origin: { y: 0.7 },
+        scalar: 1.2,
+        colors: [brand, accent, '#ffffff']
+      });
+    }, 200);
   }
 
   function escapeHtml(str) {
