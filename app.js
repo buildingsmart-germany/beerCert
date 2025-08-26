@@ -15,6 +15,18 @@
     HARD: "difficult",
   };
 
+  function canonicalizeDifficulty(raw) {
+    const v = String(raw || '').toLowerCase().trim();
+    // Common and fuzzy variants
+    if (['e', 'easy', 'einfach', 'leicht', 'beginner', 'basic', 'low', '1'].includes(v)) return Difficulty.EASY;
+    if (['m', 'med', 'medium', 'mittel', 'normal', 'intermediate', '2'].includes(v)) return Difficulty.MEDIUM;
+    if (['h', 'hard', 'difficult', 'difficul', 'diccifult', 'schwierig', 'hart', 'advanced', '3'].includes(v)) return Difficulty.HARD;
+    if (v.startsWith('eas')) return Difficulty.EASY;
+    if (v.startsWith('med')) return Difficulty.MEDIUM;
+    if (v.startsWith('dif') || v.startsWith('har') || v.startsWith('schw')) return Difficulty.HARD;
+    return '';
+  }
+
   function showToast(message) {
     let el = document.querySelector('.toast');
     if (!el) {
@@ -159,28 +171,45 @@
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
     // Expected columns: difficulty | category | question | correct | incorrect1 | incorrect2 | incorrect3
-    const normalized = rows.map((r) => ({
-      difficulty: String(r.difficulty || r.Difficulty || r.schwierigkeit || '').toLowerCase().trim(),
-      category: String(r.category || r.Category || r.kategorie || '').trim(),
-      question: String(r.question || r.Frage || '').trim(),
-      correct: String(r.correct || r.Correct || r.richtig || '').trim(),
-      incorrect: [r.incorrect1, r.incorrect2, r.incorrect3]
-        .map(v => String(v || '').trim())
-        .filter(Boolean)
-    })).filter(q => q.question && q.correct && q.incorrect.length > 0);
+    const normalized = rows.map((r) => {
+      const diffRaw = r.difficulty ?? r.Difficulty ?? r.schwierigkeit ?? r.Schwierigkeit ?? '';
+      const mapped = canonicalizeDifficulty(diffRaw);
+      return {
+        difficulty: mapped,
+        category: String(r.category || r.Category || r.kategorie || r.Kategorie || '').trim(),
+        question: String(r.question || r.Question || r.Frage || '').trim(),
+        correct: String(r.correct || r.Correct || r.richtig || r.Richtig || '').trim(),
+        incorrect: [r.incorrect1, r.incorrect2, r.incorrect3, r.Incorrect1, r.Incorrect2, r.Incorrect3]
+          .map(v => String(v || '').trim())
+          .filter(Boolean)
+      };
+    }).filter(q => q.question && q.correct && q.incorrect.length > 0);
     quizState.allQuestions = normalized;
+    // Debug counts per level for better UX when none found
+    const counts = {
+      [Difficulty.EASY]: normalized.filter(q => q.difficulty === Difficulty.EASY).length,
+      [Difficulty.MEDIUM]: normalized.filter(q => q.difficulty === Difficulty.MEDIUM).length,
+      [Difficulty.HARD]: normalized.filter(q => q.difficulty === Difficulty.HARD).length,
+      unknown: normalized.filter(q => !q.difficulty).length,
+    };
+    console.log('BeerCert question stats', counts);
   }
 
   function pickAndShowQuestion() {
     const d = quizState.currentDifficulty;
     const pool = quizState.allQuestions.filter(q => {
-      const qd = (q.difficulty || '').toLowerCase();
-      if (d === Difficulty.HARD) return qd === 'hard' || qd === 'difficult';
-      if (d === Difficulty.MEDIUM) return qd === 'medium';
-      return qd === 'easy';
+      const qd = q.difficulty || '';
+      if (d === Difficulty.HARD) return qd === Difficulty.HARD;
+      if (d === Difficulty.MEDIUM) return qd === Difficulty.MEDIUM;
+      return qd === Difficulty.EASY;
     });
     if (pool.length === 0) {
-      showToast('No questions found for this difficulty. Excel seems thirsty.');
+      const counts = {
+        easy: quizState.allQuestions.filter(q => q.difficulty === Difficulty.EASY).length,
+        medium: quizState.allQuestions.filter(q => q.difficulty === Difficulty.MEDIUM).length,
+        difficult: quizState.allQuestions.filter(q => q.difficulty === Difficulty.HARD).length,
+      };
+      showToast(`No questions for this difficulty. Found: easy ${counts.easy}, medium ${counts.medium}, difficult ${counts.difficult}.`);
       render(createStartView());
       return;
     }
