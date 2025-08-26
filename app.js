@@ -9,6 +9,41 @@
     loaded: false,
     attemptsLeft: 3,
     maxAttempts: 3,
+    currentView: 'start', // 'start' | 'question' | 'dashboard'
+  };
+
+  // Statistics tracking system
+  const statsManager = {
+    getStats() {
+      const data = localStorage.getItem('beerCertStats');
+      return data ? JSON.parse(data) : { totalAttempts: 0, beersEarned: 0, fails: 0 };
+    },
+    
+    saveStats(stats) {
+      localStorage.setItem('beerCertStats', JSON.stringify(stats));
+    },
+    
+    incrementAttempts() {
+      const stats = this.getStats();
+      stats.totalAttempts++;
+      this.saveStats(stats);
+    },
+    
+    incrementBeers() {
+      const stats = this.getStats();
+      stats.beersEarned++;
+      this.saveStats(stats);
+    },
+    
+    incrementFails() {
+      const stats = this.getStats();
+      stats.fails++;
+      this.saveStats(stats);
+    },
+    
+    reset() {
+      this.saveStats({ totalAttempts: 0, beersEarned: 0, fails: 0 });
+    }
   };
 
   const Difficulty = {
@@ -77,7 +112,10 @@
     container.className = 'section';
     container.innerHTML = `
       <div>
-        <p class="lead" data-tippy-content="A light-hearted teaser for the real thing: bSI Professional Certification.">Welcome to BeerCert — Summit Special</p>
+        <div class="start-header">
+          <p class="lead" data-tippy-content="A light-hearted teaser for the real thing: bSI Professional Certification.">Welcome to BeerCert — Summit Special</p>
+          <button id="dashboard-btn" class="dashboard-link" data-tippy-content="View session statistics">📊 Dashboard</button>
+        </div>
         <h2 class="heading">Choose your difficulty</h2>
         <div class="difficulty" role="list">
           <button class="chip" data-diff="${Difficulty.EASY}" aria-label="Beginner" data-tippy-content="Easy: like lager in a sunny beer garden."><span>Easy</span></button>
@@ -99,9 +137,20 @@
       btn.addEventListener('click', () => {
         quizState.currentDifficulty = btn.dataset.diff;
         quizState.attemptsLeft = quizState.maxAttempts; // Reset attempts
+        statsManager.incrementAttempts(); // Track new attempt
         pickAndShowQuestion();
       });
     });
+    
+    // Dashboard button handler
+    const dashboardBtn = container.querySelector('#dashboard-btn');
+    if (dashboardBtn) {
+      dashboardBtn.addEventListener('click', () => {
+        quizState.currentView = 'dashboard';
+        render(createDashboardView());
+      });
+    }
+    
     return container;
   }
 
@@ -165,6 +214,7 @@
       showResultOverlay('correct');
       triggerBeerCheersAnimation();
       triggerConfetti();
+      statsManager.incrementBeers(); // Track successful beer earning
       showToast('Correct! You may now say "win" and fetch a beer.');
       setTimeout(() => {
         render(createStartView());
@@ -184,6 +234,7 @@
           pickAndShowQuestion();
         }, 1500);
       } else {
+        statsManager.incrementFails(); // Track final failure
         showToast('All attempts used. Time to practice more before enjoying that cold drink!');
         showFinalFailAnimation();
         setTimeout(() => render(createStartView()), 2500);
@@ -263,6 +314,108 @@
         colors: [brand, accent, '#ffffff']
       });
     }, 200);
+  }
+
+  function createDashboardView() {
+    const container = document.createElement('section');
+    container.className = 'section dashboard';
+    const stats = statsManager.getStats();
+    
+    container.innerHTML = `
+      <div>
+        <div class="dashboard-header">
+          <h2 class="heading">📊 Session Dashboard</h2>
+          <div class="dashboard-actions">
+            <button id="reset-stats" class="reset-btn" data-tippy-content="Reset all statistics">🔄 Reset</button>
+            <button id="back-to-quiz" data-tippy-content="Back to the quiz">← Back</button>
+          </div>
+        </div>
+        
+        <div class="stats-grid">
+          <div class="stat-card total">
+            <div class="stat-icon">🎯</div>
+            <div class="stat-content">
+              <div class="stat-number">${stats.totalAttempts}</div>
+              <div class="stat-label">Total Attempts</div>
+            </div>
+          </div>
+          
+          <div class="stat-card success">
+            <div class="stat-icon">🍺</div>
+            <div class="stat-content">
+              <div class="stat-number">${stats.beersEarned}</div>
+              <div class="stat-label">Beers Earned</div>
+            </div>
+          </div>
+          
+          <div class="stat-card fail">
+            <div class="stat-icon">😢</div>
+            <div class="stat-content">
+              <div class="stat-number">${stats.fails}</div>
+              <div class="stat-label">Practice Needed</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="chart-container">
+          <h3 class="chart-title">Session Histogram</h3>
+          <div class="chart" id="session-chart"></div>
+        </div>
+      </div>
+    `;
+    
+    // Event handlers
+    container.querySelector('#back-to-quiz').addEventListener('click', () => {
+      quizState.currentView = 'start';
+      render(createStartView());
+    });
+    
+    container.querySelector('#reset-stats').addEventListener('click', () => {
+      if (confirm('Reset all session statistics? This cannot be undone.')) {
+        statsManager.reset();
+        render(createDashboardView()); // Refresh dashboard
+        showToast('Statistics reset successfully!');
+      }
+    });
+    
+    // Generate chart after DOM insertion
+    setTimeout(() => {
+      generateChart(stats);
+    }, 10);
+    
+    return container;
+  }
+
+  function generateChart(stats) {
+    const chartEl = document.getElementById('session-chart');
+    if (!chartEl) return;
+    
+    const total = Math.max(stats.totalAttempts, 1); // Avoid division by zero
+    const beerPercent = (stats.beersEarned / total) * 100;
+    const failPercent = (stats.fails / total) * 100;
+    const pendingPercent = Math.max(0, ((total - stats.beersEarned - stats.fails) / total) * 100);
+    
+    chartEl.innerHTML = `
+      <div class="chart-bars">
+        <div class="chart-bar beer" style="height: ${Math.max(5, beerPercent)}%">
+          <div class="bar-label">🍺</div>
+          <div class="bar-value">${stats.beersEarned}</div>
+        </div>
+        <div class="chart-bar fail" style="height: ${Math.max(5, failPercent)}%">
+          <div class="bar-label">😢</div>
+          <div class="bar-value">${stats.fails}</div>
+        </div>
+        <div class="chart-bar pending" style="height: ${Math.max(5, pendingPercent)}%">
+          <div class="bar-label">⏳</div>
+          <div class="bar-value">${total - stats.beersEarned - stats.fails}</div>
+        </div>
+      </div>
+      <div class="chart-legend">
+        <div class="legend-item beer">🍺 Beers Earned</div>
+        <div class="legend-item fail">😢 Practice Needed</div>
+        <div class="legend-item pending">⏳ In Progress</div>
+      </div>
+    `;
   }
 
   function escapeHtml(str) {
