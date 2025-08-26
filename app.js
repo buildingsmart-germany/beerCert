@@ -232,7 +232,7 @@
     }
   }
 
-  function handleAnswer(btn, q) {
+  async function handleAnswer(btn, q) {
     const all = Array.from(document.querySelectorAll('.choice'));
     all.forEach(b => b.disabled = true);
     const chosen = btn.getAttribute('data-answer');
@@ -243,7 +243,7 @@
       showResultOverlay('correct');
       triggerBeerCheersAnimation();
       triggerConfetti();
-      statsManager.incrementBeers(); // Track successful beer earning
+      await statsManager.incrementBeers(); // Track successful beer earning
       showToast('Correct! You may now say "win" and fetch a beer.');
       setTimeout(() => {
         render(createStartView());
