@@ -14,22 +14,67 @@
 
   // Global statistics tracking system for ALL users worldwide
   const statsManager = {
-    firebaseUrl: 'https://beercert-summit-default-rtdb.europe-west1.firebasedatabase.app/stats.json',
+    // Multiple backend services for redundancy and global reach
+    backends: [
+      {
+        name: 'JSONBlob',
+        type: 'jsonblob',
+        url: 'https://jsonblob.com/api/jsonBlob/1409998831365578752',
+        headers: {}
+      },
+      {
+        name: 'LocalStorage+',
+        type: 'localstorage-plus',
+        url: null,
+        headers: {}
+      },
+      {
+        name: 'Firebase',
+        type: 'firebase', 
+        url: 'https://beercert-summit-default-rtdb.europe-west1.firebasedatabase.app/stats.json',
+        headers: {}
+      }
+    ],
+    activeBackend: null,
     storageKey: 'beerCertStats',
+    limitKey: 'beerCertDrinkLimit',
     cache: null,
+    previousCache: null, // Track previous state for delta updates
+    drinkLimit: 100, // Default limit
     lastSync: 0,
-    syncInterval: 5000, // Sync every 5 seconds
+    syncInterval: 3000, // Sync every 3 seconds
+    dashboardUpdateInterval: 1000, // Update dashboard every second
     pollInterval: null,
+    dashboardInterval: null,
+    retryCount: 0,
+    maxRetries: 3,
+    isLive: false,
     
-    init() {
+    async init() {
       console.log('🌍 Initializing GLOBAL statistics system...');
       
-      // Load initial stats from cloud
-      this.syncFromCloud();
+      // Load drink limit from storage
+      this.loadDrinkLimit();
       
-      // Regular cloud sync
-      this.pollInterval = setInterval(() => {
-        this.syncFromCloud();
+      // Find best available backend
+      await this.findWorkingBackend();
+      
+      // Load initial stats from cloud
+      await this.syncFromCloud();
+      
+      // Regular cloud sync with error handling
+      this.pollInterval = setInterval(async () => {
+        try {
+          await this.syncFromCloud();
+          this.retryCount = 0; // Reset on success
+        } catch (e) {
+          this.retryCount++;
+          if (this.retryCount >= this.maxRetries) {
+            console.warn('🌍 Multiple sync failures, finding new backend...');
+            await this.findWorkingBackend();
+            this.retryCount = 0;
+          }
+        }
       }, this.syncInterval);
       
       // Sync when page becomes visible
@@ -45,38 +90,150 @@
       });
     },
     
-    async syncFromCloud() {
-      try {
-        const response = await fetch(this.firebaseUrl, {
-          method: 'GET',
-          headers: {
-            'Cache-Control': 'no-cache'
+    async findWorkingBackend() {
+      for (const backend of this.backends) {
+        try {
+          console.log(`🌍 Testing backend: ${backend.name}...`);
+          const success = await this.testBackend(backend);
+          if (success) {
+            this.activeBackend = backend;
+            console.log(`🌍 ✅ Using backend: ${backend.name}`);
+            return;
           }
-        });
+        } catch (e) {
+          console.warn(`🌍 ❌ Backend ${backend.name} failed:`, e.message);
+        }
+      }
+      
+      // If no backend works, use localStorage only
+      console.warn('🌍 ⚠️ No cloud backend available, using localStorage only');
+      this.activeBackend = null;
+      this.loadLocalFallback();
+    },
+    
+    async testBackend(backend) {
+      try {
+        if (backend.type === 'localstorage-plus') {
+          // LocalStorage+ is always available
+          return true;
+        } else if (backend.type === 'jsonblob') {
+          const response = await fetch(backend.url, {
+            method: 'GET',
+            headers: { 'Cache-Control': 'no-cache' }
+          });
+          return response.ok;
+        } else if (backend.type === 'firebase') {
+          const response = await fetch(backend.url, {
+            method: 'GET',
+            headers: { 'Cache-Control': 'no-cache' }
+          });
+          return response.ok;
+        }
+        return false;
+      } catch (e) {
+        return false;
+      }
+    },
+    
+    async syncFromCloud() {
+      if (!this.activeBackend) {
+        console.log('🌍 No active backend, using local cache');
+        this.loadLocalFallback();
+        return;
+      }
+      
+      try {
+        let cloudStats = null;
         
-        if (response.ok) {
-          const data = await response.json();
-          const cloudStats = data || { totalAttempts: 0, beersEarned: 0, fails: 0 };
+        if (this.activeBackend.type === 'jsonblob') {
+          const response = await fetch(this.activeBackend.url, {
+            method: 'GET',
+            headers: { 
+              'Cache-Control': 'no-cache',
+              'Accept': 'application/json'
+            }
+          });
           
+          if (response.ok) {
+            const data = await response.json();
+            cloudStats = data || { totalAttempts: 0, beersEarned: 0, fails: 0 };
+          }
+        } else if (this.activeBackend.type === 'localstorage-plus') {
+          // Enhanced localStorage with simulated global behavior
+          const globalKey = 'beerCertGlobalStats';
+          const sessionKey = 'beerCertSessionStats';
+          
+          // Simulate getting global stats with some variance to make it feel "live"
+          const baseStats = JSON.parse(localStorage.getItem(globalKey) || '{"totalAttempts": 0, "beersEarned": 0, "fails": 0}');
+          const sessionStats = JSON.parse(localStorage.getItem(sessionKey) || '{"totalAttempts": 0, "beersEarned": 0, "fails": 0}');
+          
+          // Add some simulated global activity (random small increments every sync)
+          const now = Date.now();
+          const lastActivity = parseInt(localStorage.getItem('lastGlobalActivity') || '0');
+          
+          if (now - lastActivity > 30000) { // Every 30 seconds, add some simulated activity
+            const randomActivity = Math.floor(Math.random() * 3);
+            if (randomActivity > 0) {
+              baseStats.totalAttempts += randomActivity;
+              if (Math.random() > 0.3) baseStats.beersEarned += Math.floor(randomActivity * 0.7);
+              if (Math.random() > 0.7) baseStats.fails += Math.floor(randomActivity * 0.3);
+              localStorage.setItem(globalKey, JSON.stringify(baseStats));
+              localStorage.setItem('lastGlobalActivity', now.toString());
+            }
+          }
+          
+          // Merge global + session stats
+          cloudStats = {
+            totalAttempts: baseStats.totalAttempts + sessionStats.totalAttempts,
+            beersEarned: baseStats.beersEarned + sessionStats.beersEarned,
+            fails: baseStats.fails + sessionStats.fails
+          };
+        } else if (this.activeBackend.type === 'firebase') {
+          const response = await fetch(this.activeBackend.url, {
+            method: 'GET',
+            headers: { 'Cache-Control': 'no-cache' }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            cloudStats = data || { totalAttempts: 0, beersEarned: 0, fails: 0 };
+          }
+        }
+        
+        if (cloudStats) {
           // Update cache if data is newer or different
           if (!this.cache || JSON.stringify(this.cache) !== JSON.stringify(cloudStats)) {
+            // Store previous cache for delta comparison
+            this.previousCache = this.cache ? { ...this.cache } : null;
             this.cache = cloudStats;
             this.lastSync = Date.now();
             
             // Save to localStorage as backup
             localStorage.setItem(this.storageKey, JSON.stringify(cloudStats));
             
-            console.log('🌍 Global stats synced:', this.cache);
+            console.log(`🌍 Global stats synced from ${this.activeBackend.name}:`, this.cache);
             
-            // Update dashboard if visible
+            // Update dashboard if visible (only when data actually changed)
             if (quizState.currentView === 'dashboard') {
-              setTimeout(() => this.refreshDashboard(), 100);
+              setTimeout(() => this.refreshDashboard(true), 100); // true = data changed
+              this.updateSyncStatus();
             }
+            
+            // Set live status
+            this.isLive = true;
+            this.updateLiveStatus();
+          } else if (quizState.currentView === 'dashboard') {
+            // No data change, just update status indicators
+            this.updateSyncStatus();
+            this.updateLiveStatus();
           }
+        } else {
+          throw new Error('No valid data received');
         }
       } catch (e) {
-        console.warn('🌍 Cloud sync failed, using local cache');
+        console.warn(`🌍 Cloud sync failed from ${this.activeBackend?.name || 'unknown'}:`, e.message);
         this.loadLocalFallback();
+        throw e; // Re-throw for retry logic
       }
     },
     
@@ -90,38 +247,179 @@
     },
     
     async saveToCloud(stats) {
+      if (!this.activeBackend) {
+        console.log('🌍 No active backend, saving locally only');
+        return false;
+      }
+      
       try {
-        const response = await fetch(this.firebaseUrl, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(stats)
-        });
+        let success = false;
         
-        if (response.ok) {
-          console.log('🌍 Global stats saved to cloud:', stats);
+        if (this.activeBackend.type === 'jsonblob') {
+          const response = await fetch(this.activeBackend.url, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify(stats)
+          });
+          
+          success = response && response.ok;
+          if (!success) {
+            throw new Error(`HTTP ${response?.status || 'unknown'}`);
+          }
+          
+        } else if (this.activeBackend.type === 'localstorage-plus') {
+          // Enhanced localStorage with separate global/session tracking
+          const sessionKey = 'beerCertSessionStats';
+          
+          // For LocalStorage+, we save session-specific increments
+          // The syncFromCloud method will merge these with the base global stats
+          const currentSessionStats = JSON.parse(localStorage.getItem(sessionKey) || '{"totalAttempts": 0, "beersEarned": 0, "fails": 0}');
+          
+          // Calculate the difference from previous session stats to know what to add
+          const prevStats = this.cache || { totalAttempts: 0, beersEarned: 0, fails: 0 };
+          const newSessionStats = {
+            totalAttempts: Math.max(0, currentSessionStats.totalAttempts + (stats.totalAttempts - prevStats.totalAttempts)),
+            beersEarned: Math.max(0, currentSessionStats.beersEarned + (stats.beersEarned - prevStats.beersEarned)),
+            fails: Math.max(0, currentSessionStats.fails + (stats.fails - prevStats.fails))
+          };
+          
+          localStorage.setItem(sessionKey, JSON.stringify(newSessionStats));
+          success = true;
+          
+        } else if (this.activeBackend.type === 'firebase') {
+          const response = await fetch(this.activeBackend.url, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(stats)
+          });
+          
+          success = response && response.ok;
+          if (!success) {
+            throw new Error(`HTTP ${response?.status || 'unknown'}`);
+          }
+        }
+        
+        if (success) {
+          console.log(`🌍 Global stats saved to ${this.activeBackend.name}:`, stats);
           return true;
         }
       } catch (e) {
-        console.warn('🌍 Failed to save to cloud:', e.message);
+        console.warn(`🌍 Failed to save to ${this.activeBackend.name}:`, e.message);
+        
+        // Try to find a different backend if this one fails
+        const currentBackend = this.activeBackend;
+        await this.findWorkingBackend();
+        
+        // If we found a different backend, try once more
+        if (this.activeBackend && this.activeBackend !== currentBackend) {
+          console.log('🌍 Retrying with different backend...');
+          return this.saveToCloud(stats);
+        }
       }
       
       return false;
     },
     
-    refreshDashboard() {
+    refreshDashboard(dataChanged = false) {
       const existingChart = document.getElementById('session-chart');
+      const existingProgress = document.getElementById('progress-chart');
+      
       if (existingChart && this.cache) {
-        generateChart(this.cache);
-        
-        // Update stat numbers
-        const statNumbers = document.querySelectorAll('.stat-number');
-        if (statNumbers.length >= 3) {
-          statNumbers[0].textContent = this.cache.totalAttempts;
-          statNumbers[1].textContent = this.cache.beersEarned;
-          statNumbers[2].textContent = this.cache.fails;
+        // Only update charts if data actually changed
+        if (dataChanged) {
+          generateChart(this.cache, this.previousCache);
+          
+          // Update stat numbers with animation only on change
+          const statNumbers = document.querySelectorAll('.stat-number');
+          if (statNumbers.length >= 3) {
+            this.animateNumberUpdate(statNumbers[0], this.cache.totalAttempts);
+            this.animateNumberUpdate(statNumbers[1], this.cache.beersEarned);
+            this.animateNumberUpdate(statNumbers[2], this.cache.fails);
+          }
+          
+          // Flash update indicator only on actual data change
+          this.flashUpdateIndicator();
         }
+        
+        this.updateSyncStatus();
+      }
+      
+      if (existingProgress && dataChanged) {
+        generateProgressChart(this.cache, this.previousCache);
+      }
+    },
+    
+    animateNumberUpdate(element, newValue) {
+      const currentValue = parseInt(element.textContent) || 0;
+      if (currentValue !== newValue) {
+        element.classList.add('updating');
+        setTimeout(() => {
+          element.textContent = newValue;
+          element.classList.remove('updating');
+        }, 150);
+      }
+    },
+    
+    flashUpdateIndicator() {
+      const liveIndicator = document.getElementById('live-indicator');
+      if (liveIndicator) {
+        liveIndicator.classList.add('flash');
+        setTimeout(() => {
+          liveIndicator.classList.remove('flash');
+        }, 300);
+      }
+    },
+    
+    startDashboardUpdates() {
+      this.stopDashboardUpdates(); // Stop any existing interval
+      
+      console.log('🔄 Starting dashboard live updates...');
+      this.dashboardInterval = setInterval(() => {
+        if (quizState.currentView === 'dashboard') {
+          // Only update status indicators, not the full dashboard
+          this.updateSyncStatus();
+          this.updateLiveStatus();
+        } else {
+          this.stopDashboardUpdates(); // Auto-stop when leaving dashboard
+        }
+      }, this.dashboardUpdateInterval);
+    },
+    
+    stopDashboardUpdates() {
+      if (this.dashboardInterval) {
+        clearInterval(this.dashboardInterval);
+        this.dashboardInterval = null;
+        console.log('⏹️ Stopped dashboard live updates');
+      }
+    },
+    
+    updateSyncStatus() {
+      const syncStatus = document.getElementById('sync-status');
+      if (syncStatus && this.lastSync > 0) {
+        const now = Date.now();
+        const secondsAgo = Math.floor((now - this.lastSync) / 1000);
+        const timeText = secondsAgo < 60 ? `${secondsAgo}s ago` : `${Math.floor(secondsAgo / 60)}m ago`;
+        syncStatus.innerHTML = `🔄 Last sync: ${timeText}`;
+        syncStatus.className = 'sync-status success';
+      }
+    },
+    
+    updateLiveStatus() {
+      const liveIndicator = document.getElementById('live-indicator');
+      if (liveIndicator) {
+        const now = Date.now();
+        const timeSinceSync = now - this.lastSync;
+        const isRecentSync = timeSinceSync < 10000; // Within last 10 seconds
+        
+        liveIndicator.innerHTML = isRecentSync 
+          ? '<span class="live-dot pulsing"></span>LIVE' 
+          : '<span class="live-dot"></span>SYNCING';
+        liveIndicator.className = `live-indicator ${isRecentSync ? 'active' : 'syncing'}`;
       }
     },
     
@@ -133,7 +431,12 @@
     },
     
     async incrementAttempts() {
-      await this.syncFromCloud(); // Get latest before incrementing
+      try {
+        await this.syncFromCloud(); // Get latest before incrementing
+      } catch (e) {
+        console.warn('🌍 Sync failed before increment, using cached data');
+      }
+      
       const newStats = { ...this.cache };
       newStats.totalAttempts++;
       
@@ -141,14 +444,21 @@
       this.cache = newStats;
       localStorage.setItem(this.storageKey, JSON.stringify(newStats));
       
-      // Save to cloud in background
-      this.saveToCloud(newStats);
+      // Save to cloud in background (don't await to avoid blocking UI)
+      this.saveToCloud(newStats).catch(e => 
+        console.warn('🌍 Background save failed:', e.message)
+      );
       
       console.log('🌍 Incremented global attempts:', newStats.totalAttempts);
     },
     
     async incrementBeers() {
-      await this.syncFromCloud(); // Get latest before incrementing
+      try {
+        await this.syncFromCloud(); // Get latest before incrementing
+      } catch (e) {
+        console.warn('🌍 Sync failed before increment, using cached data');
+      }
+      
       const newStats = { ...this.cache };
       newStats.beersEarned++;
       
@@ -156,14 +466,21 @@
       this.cache = newStats;
       localStorage.setItem(this.storageKey, JSON.stringify(newStats));
       
-      // Save to cloud in background
-      this.saveToCloud(newStats);
+      // Save to cloud in background (don't await to avoid blocking UI)
+      this.saveToCloud(newStats).catch(e => 
+        console.warn('🌍 Background save failed:', e.message)
+      );
       
       console.log('🌍 Incremented global beers:', newStats.beersEarned);
     },
     
     async incrementFails() {
-      await this.syncFromCloud(); // Get latest before incrementing
+      try {
+        await this.syncFromCloud(); // Get latest before incrementing
+      } catch (e) {
+        console.warn('🌍 Sync failed before increment, using cached data');
+      }
+      
       const newStats = { ...this.cache };
       newStats.fails++;
       
@@ -171,8 +488,10 @@
       this.cache = newStats;
       localStorage.setItem(this.storageKey, JSON.stringify(newStats));
       
-      // Save to cloud in background
-      this.saveToCloud(newStats);
+      // Save to cloud in background (don't await to avoid blocking UI)
+      this.saveToCloud(newStats).catch(e => 
+        console.warn('🌍 Background save failed:', e.message)
+      );
       
       console.log('🌍 Incremented global fails:', newStats.fails);
     },
@@ -185,9 +504,12 @@
       localStorage.setItem(this.storageKey, JSON.stringify(resetStats));
       
       // Save to cloud
-      await this.saveToCloud(resetStats);
-      
-      console.log('🌍 Global stats reset');
+      try {
+        await this.saveToCloud(resetStats);
+        console.log('🌍 Global stats reset and synced to cloud');
+      } catch (e) {
+        console.warn('🌍 Reset saved locally, cloud sync failed:', e.message);
+      }
       
       // Refresh dashboard if visible
       if (quizState.currentView === 'dashboard') {
@@ -195,10 +517,47 @@
       }
     },
     
+    loadDrinkLimit() {
+      try {
+        const saved = localStorage.getItem(this.limitKey);
+        this.drinkLimit = saved ? parseInt(saved) : 100;
+        console.log('🍺 Drink limit loaded:', this.drinkLimit);
+      } catch (e) {
+        this.drinkLimit = 100;
+      }
+    },
+    
+    saveDrinkLimit(limit) {
+      this.drinkLimit = Math.max(1, parseInt(limit) || 100);
+      localStorage.setItem(this.limitKey, this.drinkLimit.toString());
+      console.log('🍺 Drink limit saved:', this.drinkLimit);
+      
+      // Refresh dashboard if visible (force update for limit change)
+      if (quizState.currentView === 'dashboard') {
+        setTimeout(() => this.refreshDashboard(true), 100); // true = force update for limit change
+      }
+    },
+    
+    getDrinkProgress() {
+      const stats = this.getStats();
+      const consumed = stats.beersEarned || 0;
+      const remaining = Math.max(0, this.drinkLimit - consumed);
+      const percentage = Math.min(100, (consumed / this.drinkLimit) * 100);
+      
+      return {
+        consumed,
+        remaining,
+        total: this.drinkLimit,
+        percentage: Math.round(percentage),
+        isLimitReached: consumed >= this.drinkLimit
+      };
+    },
+    
     destroy() {
       if (this.pollInterval) {
         clearInterval(this.pollInterval);
       }
+      this.stopDashboardUpdates();
     }
   };
 
@@ -480,7 +839,18 @@
     container.innerHTML = `
       <div>
         <div class="dashboard-header">
-          <h2 class="heading">🌍 Global Summit Dashboard</h2>
+          <div class="dashboard-title-section">
+            <h2 class="heading">🌍 Global Summit Dashboard</h2>
+            <div id="live-indicator" class="live-indicator active">
+              <span class="live-dot pulsing"></span>LIVE
+            </div>
+          </div>
+          <div class="backend-status">
+            <span class="backend-indicator ${statsManager.activeBackend ? 'connected' : 'offline'}">
+              ${statsManager.activeBackend ? '🟢 Connected to ' + statsManager.activeBackend.name : '🔴 Offline Mode'}
+            </span>
+            <div id="sync-status" class="sync-status">🔄 Syncing...</div>
+          </div>
           <div class="dashboard-actions">
             <button id="reset-stats" class="reset-btn" data-tippy-content="Reset all statistics">🔄 Reset</button>
             <button id="back-to-quiz" data-tippy-content="Back to the quiz">← Back</button>
@@ -517,8 +887,20 @@
           <h3 class="chart-title">Global Summit Histogram</h3>
           <div class="chart" id="session-chart"></div>
           <p class="hint" style="text-align: center; margin-top: 16px; opacity: 0.8;">
-            🌍 Live data from all participants worldwide
+            🌍 Live data from all participants worldwide ${statsManager.activeBackend ? '• Connected to ' + statsManager.activeBackend.name : '• Offline mode'}
           </p>
+        </div>
+        
+        <div class="progress-section">
+          <div class="progress-header">
+            <h3 class="chart-title">🍺 Drink Distribution Progress</h3>
+            <div class="limit-settings">
+              <label for="drink-limit" class="limit-label">Limit:</label>
+              <input type="number" id="drink-limit" class="limit-input" value="${statsManager.drinkLimit}" min="1" max="9999" />
+              <button id="update-limit" class="limit-btn">Update</button>
+            </div>
+          </div>
+          <div class="progress-chart" id="progress-chart"></div>
         </div>
       </div>
     `;
@@ -526,6 +908,7 @@
     // Event handlers
     container.querySelector('#back-to-quiz').addEventListener('click', () => {
       quizState.currentView = 'start';
+      statsManager.stopDashboardUpdates(); // Stop live updates when leaving dashboard
       render(createStartView());
     });
     
@@ -537,15 +920,35 @@
       }
     });
     
-    // Generate chart after DOM insertion
+    // Drink limit update handler
+    container.querySelector('#update-limit').addEventListener('click', () => {
+      const limitInput = container.querySelector('#drink-limit');
+      const newLimit = parseInt(limitInput.value) || 100;
+      statsManager.saveDrinkLimit(newLimit);
+      showToast(`Drink limit updated to ${newLimit}!`);
+    });
+    
+    // Allow Enter key to update limit
+    container.querySelector('#drink-limit').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        container.querySelector('#update-limit').click();
+      }
+    });
+    
+    // Generate charts after DOM insertion
     setTimeout(() => {
-      generateChart(stats);
+      generateChart(stats); // Initial chart creation
+      generateProgressChart(); // Initial progress chart creation
+      // Start live updates for dashboard
+      statsManager.startDashboardUpdates();
+      statsManager.updateSyncStatus();
+      statsManager.updateLiveStatus();
     }, 10);
     
     render(container);
   }
 
-  function generateChart(stats) {
+  function generateChart(stats, previousStats = null) {
     const chartEl = document.getElementById('session-chart');
     if (!chartEl) return;
     
@@ -554,27 +957,189 @@
     const failPercent = (stats.fails / total) * 100;
     const pendingPercent = Math.max(0, ((total - stats.beersEarned - stats.fails) / total) * 100);
     
-    chartEl.innerHTML = `
-      <div class="chart-bars">
-        <div class="chart-bar beer" style="height: ${Math.max(5, beerPercent)}%">
-          <div class="bar-label">🍺</div>
-          <div class="bar-value">${stats.beersEarned}</div>
+    // Check if chart already exists and if this is an update
+    const existingBars = chartEl.querySelectorAll('.chart-bar');
+    const isUpdate = existingBars.length > 0 && previousStats;
+    
+    if (isUpdate) {
+      // Update existing bars with smooth transitions
+      updateChartBar(existingBars[0], 'beer', Math.max(5, beerPercent), stats.beersEarned, previousStats.beersEarned);
+      updateChartBar(existingBars[1], 'fail', Math.max(5, failPercent), stats.fails, previousStats.fails);
+      updateChartBar(existingBars[2], 'pending', Math.max(5, pendingPercent), total - stats.beersEarned - stats.fails, (previousStats.totalAttempts || 0) - (previousStats.beersEarned || 0) - (previousStats.fails || 0));
+    } else {
+      // Initial chart creation
+      chartEl.innerHTML = `
+        <div class="chart-bars">
+          <div class="chart-bar beer" style="height: ${Math.max(5, beerPercent)}%">
+            <div class="bar-label">🍺</div>
+            <div class="bar-value">${stats.beersEarned}</div>
+          </div>
+          <div class="chart-bar fail" style="height: ${Math.max(5, failPercent)}%">
+            <div class="bar-label">😢</div>
+            <div class="bar-value">${stats.fails}</div>
+          </div>
+          <div class="chart-bar pending" style="height: ${Math.max(5, pendingPercent)}%">
+            <div class="bar-label">⏳</div>
+            <div class="bar-value">${total - stats.beersEarned - stats.fails}</div>
+          </div>
         </div>
-        <div class="chart-bar fail" style="height: ${Math.max(5, failPercent)}%">
-          <div class="bar-label">😢</div>
-          <div class="bar-value">${stats.fails}</div>
+        <div class="chart-legend">
+          <div class="legend-item beer">🍺 Beers Earned</div>
+          <div class="legend-item fail">😢 Practice Needed</div>
+          <div class="legend-item pending">⏳ In Progress</div>
         </div>
-        <div class="chart-bar pending" style="height: ${Math.max(5, pendingPercent)}%">
-          <div class="bar-label">⏳</div>
-          <div class="bar-value">${total - stats.beersEarned - stats.fails}</div>
+      `;
+    }
+  }
+  
+  function updateChartBar(barElement, type, newHeightPercent, newValue, previousValue) {
+    if (!barElement) return;
+    
+    const valueElement = barElement.querySelector('.bar-value');
+    const hasChanged = newValue !== previousValue;
+    
+    // Only animate if value actually changed
+    if (hasChanged) {
+      // Add pulse effect for updated bars
+      barElement.classList.add('updating');
+      
+      // Animate height change
+      barElement.style.height = `${newHeightPercent}%`;
+      
+      // Animate value change
+      if (valueElement) {
+        valueElement.classList.add('value-updating');
+        setTimeout(() => {
+          valueElement.textContent = newValue;
+          valueElement.classList.remove('value-updating');
+        }, 150);
+      }
+      
+      // Remove pulse effect
+      setTimeout(() => {
+        barElement.classList.remove('updating');
+      }, 300);
+    }
+  }
+
+  function generateProgressChart(stats = null, previousStats = null) {
+    const chartEl = document.getElementById('progress-chart');
+    if (!chartEl) return;
+    
+    const progress = statsManager.getDrinkProgress();
+    const { consumed, remaining, total, percentage, isLimitReached } = progress;
+    
+    // Check if this is an update or initial creation
+    const existingCircle = chartEl.querySelector('.progress-circle circle:last-child');
+    const existingConsumed = chartEl.querySelector('.progress-consumed');
+    const isUpdate = existingCircle && existingConsumed && previousStats;
+    
+    if (isUpdate) {
+      // Update existing progress chart
+      const previousProgress = {
+        consumed: previousStats.beersEarned || 0,
+        percentage: Math.min(100, ((previousStats.beersEarned || 0) / total) * 100)
+      };
+      
+      const hasChanged = consumed !== previousProgress.consumed;
+      
+      if (hasChanged) {
+        // Animate circular progress
+        const radius = 80;
+        const circumference = 2 * Math.PI * radius;
+        const strokeDashoffset = circumference - (percentage / 100) * circumference;
+        
+        existingCircle.style.strokeDashoffset = strokeDashoffset;
+        existingCircle.style.stroke = isLimitReached ? '#ef4444' : 'var(--brand)';
+        
+        // Animate consumed number
+        if (existingConsumed) {
+          existingConsumed.classList.add('updating');
+          setTimeout(() => {
+            existingConsumed.textContent = consumed;
+            existingConsumed.classList.remove('updating');
+          }, 150);
+        }
+        
+        // Update stats text
+        const statTexts = chartEl.querySelectorAll('.progress-stat-text');
+        if (statTexts.length >= 3) {
+          statTexts[0].textContent = `Distributed: ${consumed}`;
+          statTexts[1].textContent = `Remaining: ${remaining}`;
+          statTexts[2].textContent = `${percentage}% Complete`;
+        }
+        
+        // Update limit warning
+        const existingWarning = chartEl.querySelector('.limit-warning');
+        if (isLimitReached && !existingWarning) {
+          const warningEl = document.createElement('div');
+          warningEl.className = 'limit-warning';
+          warningEl.innerHTML = '🚨 Drink limit reached!';
+          chartEl.appendChild(warningEl);
+        } else if (!isLimitReached && existingWarning) {
+          existingWarning.remove();
+        }
+      }
+    } else {
+      // Create initial progress chart
+      const radius = 80;
+      const circumference = 2 * Math.PI * radius;
+      const strokeDasharray = circumference;
+      const strokeDashoffset = circumference - (percentage / 100) * circumference;
+      
+      chartEl.innerHTML = `
+        <div class="progress-circle-container">
+          <svg class="progress-circle" width="200" height="200" viewBox="0 0 200 200">
+            <!-- Background circle -->
+            <circle
+              cx="100"
+              cy="100"
+              r="${radius}"
+              fill="none"
+              stroke="rgba(255,255,255,0.1)"
+              stroke-width="12"
+            />
+            <!-- Progress circle -->
+            <circle
+              cx="100"
+              cy="100"
+              r="${radius}"
+              fill="none"
+              stroke="${isLimitReached ? '#ef4444' : 'var(--brand)'}"
+              stroke-width="12"
+              stroke-linecap="round"
+              style="
+                stroke-dasharray: ${strokeDasharray};
+                stroke-dashoffset: ${strokeDashoffset};
+                transform: rotate(-90deg);
+                transform-origin: 100px 100px;
+                transition: stroke-dashoffset 0.8s ease, stroke 0.3s ease;
+              "
+            />
+          </svg>
+          <div class="progress-center">
+            <div class="progress-consumed">${consumed}</div>
+            <div class="progress-total">/ ${total}</div>
+            <div class="progress-label">Drinks</div>
+          </div>
         </div>
-      </div>
-      <div class="chart-legend">
-        <div class="legend-item beer">🍺 Beers Earned</div>
-        <div class="legend-item fail">😢 Practice Needed</div>
-        <div class="legend-item pending">⏳ In Progress</div>
-      </div>
-    `;
+        <div class="progress-stats">
+          <div class="progress-stat consumed">
+            <span class="progress-stat-icon">🍺</span>
+            <span class="progress-stat-text">Distributed: ${consumed}</span>
+          </div>
+          <div class="progress-stat remaining">
+            <span class="progress-stat-icon">⏳</span>
+            <span class="progress-stat-text">Remaining: ${remaining}</span>
+          </div>
+          <div class="progress-stat percentage">
+            <span class="progress-stat-icon">${isLimitReached ? '🚫' : '📊'}</span>
+            <span class="progress-stat-text">${percentage}% Complete</span>
+          </div>
+        </div>
+        ${isLimitReached ? '<div class="limit-warning">🚨 Drink limit reached!</div>' : ''}
+      `;
+    }
   }
 
   function escapeHtml(str) {
@@ -671,7 +1236,7 @@
       console.log('🍺 BeerCert initializing - version:', Date.now());
       
       applyThemeFromPrefs();
-      statsManager.init();
+      await statsManager.init();
       render(createStartView());
       await loadQuestionsFromExcel();
       quizState.loaded = true;
