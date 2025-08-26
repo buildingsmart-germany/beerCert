@@ -172,16 +172,36 @@
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
     // Expected columns: difficulty | category | question | correct | incorrect1 | incorrect2 | incorrect3
     const normalized = rows.map((r) => {
-      const diffRaw = r.difficulty ?? r.Difficulty ?? r.schwierigkeit ?? r.Schwierigkeit ?? '';
+      // Normalize keys access (support various header styles)
+      const diffRaw = r.difficulty ?? r.Difficulty ?? r['Difficulty'] ?? r['Difficulty Level'] ?? r.schwierigkeit ?? r.Schwierigkeit ?? '';
       const mapped = canonicalizeDifficulty(diffRaw);
+      const question = r.question ?? r.Question ?? r['Frage'] ?? r['question'] ?? '';
+      const correct = r.correct ?? r.Correct ?? r['Correct'] ?? r['Correct Answer'] ?? r['richtig'] ?? r['Richtig'] ?? '';
+
+      // Collect incorrect options from a variety of headers
+      const incorrectCandidates = [];
+      const keys = Object.keys(r);
+      keys.forEach((k) => {
+        const lower = String(k).toLowerCase();
+        if (lower.includes('incorrect')) {
+          const val = r[k];
+          if (val !== undefined && String(val).trim() !== '') incorrectCandidates.push(String(val).trim());
+        }
+      });
+      // Also consider specific common names
+      const specificIncorrect = [
+        r.incorrect1, r.incorrect2, r.incorrect3,
+        r.Incorrect1, r.Incorrect2, r.Incorrect3,
+        r['Incorrect Option A'], r['Incorrect Option B'], r['Incorrect Option C']
+      ].filter(v => v !== undefined && String(v).trim() !== '').map(v => String(v).trim());
+      const incorrect = Array.from(new Set([ ...incorrectCandidates, ...specificIncorrect ]));
+
       return {
         difficulty: mapped,
         category: String(r.category || r.Category || r.kategorie || r.Kategorie || '').trim(),
-        question: String(r.question || r.Question || r.Frage || '').trim(),
-        correct: String(r.correct || r.Correct || r.richtig || r.Richtig || '').trim(),
-        incorrect: [r.incorrect1, r.incorrect2, r.incorrect3, r.Incorrect1, r.Incorrect2, r.Incorrect3]
-          .map(v => String(v || '').trim())
-          .filter(Boolean)
+        question: String(question).trim(),
+        correct: String(correct).trim(),
+        incorrect
       };
     }).filter(q => q.question && q.correct && q.incorrect.length > 0);
     quizState.allQuestions = normalized;
