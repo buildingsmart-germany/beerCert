@@ -12,37 +12,66 @@
     currentView: 'start', // 'start' | 'question' | 'dashboard'
   };
 
-  // Statistics tracking system
+  // Statistics tracking system with shared session storage
   const statsManager = {
-    getStats() {
-      const data = localStorage.getItem('beerCertStats');
-      return data ? JSON.parse(data) : { totalAttempts: 0, beersEarned: 0, fails: 0 };
+    sessionId: localStorage.getItem('beerCertSessionId') || 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    
+    init() {
+      localStorage.setItem('beerCertSessionId', this.sessionId);
     },
     
-    saveStats(stats) {
-      localStorage.setItem('beerCertStats', JSON.stringify(stats));
+    async getStats() {
+      try {
+        const response = await fetch(`https://api.jsonbin.io/v3/b/67703c59ad19ca34f8daf0b2`, {
+          headers: {
+            'X-Master-Key': '$2a$10$vNlSH7yXx5yrXdQ6ZRJsQO8BL1O5Oz4RyvUGkB7pDPKOeH0rNV0v2'
+          }
+        });
+        const data = await response.json();
+        return data.record || { totalAttempts: 0, beersEarned: 0, fails: 0 };
+      } catch (e) {
+        console.warn('Failed to fetch shared stats, using local fallback');
+        const data = localStorage.getItem('beerCertStats');
+        return data ? JSON.parse(data) : { totalAttempts: 0, beersEarned: 0, fails: 0 };
+      }
     },
     
-    incrementAttempts() {
-      const stats = this.getStats();
+    async saveStats(stats) {
+      try {
+        await fetch(`https://api.jsonbin.io/v3/b/67703c59ad19ca34f8daf0b2`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Master-Key': '$2a$10$vNlSH7yXx5yrXdQ6ZRJsQO8BL1O5Oz4RyvUGkB7pDPKOeH0rNV0v2'
+          },
+          body: JSON.stringify(stats)
+        });
+      } catch (e) {
+        console.warn('Failed to save shared stats, saving locally');
+        localStorage.setItem('beerCertStats', JSON.stringify(stats));
+      }
+    },
+    
+    async incrementAttempts() {
+      const stats = await this.getStats();
       stats.totalAttempts++;
-      this.saveStats(stats);
+      await this.saveStats(stats);
     },
     
-    incrementBeers() {
-      const stats = this.getStats();
+    async incrementBeers() {
+      const stats = await this.getStats();
       stats.beersEarned++;
-      this.saveStats(stats);
+      await this.saveStats(stats);
     },
     
-    incrementFails() {
-      const stats = this.getStats();
+    async incrementFails() {
+      const stats = await this.getStats();
       stats.fails++;
-      this.saveStats(stats);
+      await this.saveStats(stats);
     },
     
-    reset() {
-      this.saveStats({ totalAttempts: 0, beersEarned: 0, fails: 0 });
+    async reset() {
+      await this.saveStats({ totalAttempts: 0, beersEarned: 0, fails: 0 });
     }
   };
 
@@ -114,7 +143,7 @@
       <div>
         <div class="start-header">
           <p class="lead" data-tippy-content="A light-hearted teaser for the real thing: bSI Professional Certification.">Welcome to BeerCert — Summit Special</p>
-          <button id="dashboard-btn" class="dashboard-link" data-tippy-content="View session statistics">📊 Dashboard</button>
+          <button id="dashboard-btn" class="dashboard-icon" data-tippy-content="Statistics">📊</button>
         </div>
         <h2 class="heading">Choose your difficulty</h2>
         <div class="difficulty" role="list">
@@ -134,10 +163,10 @@
       status.textContent = 'Loading questions…';
     }
     container.querySelectorAll('.chip').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         quizState.currentDifficulty = btn.dataset.diff;
         quizState.attemptsLeft = quizState.maxAttempts; // Reset attempts
-        statsManager.incrementAttempts(); // Track new attempt
+        await statsManager.incrementAttempts(); // Track new attempt
         pickAndShowQuestion();
       });
     });
@@ -147,7 +176,7 @@
     if (dashboardBtn) {
       dashboardBtn.addEventListener('click', () => {
         quizState.currentView = 'dashboard';
-        render(createDashboardView());
+        showDashboard();
       });
     }
     
@@ -234,7 +263,7 @@
           pickAndShowQuestion();
         }, 1500);
       } else {
-        statsManager.incrementFails(); // Track final failure
+        await statsManager.incrementFails(); // Track final failure
         showToast('All attempts used. Time to practice more before enjoying that cold drink!');
         showFinalFailAnimation();
         setTimeout(() => render(createStartView()), 2500);
@@ -316,10 +345,10 @@
     }, 200);
   }
 
-  function createDashboardView() {
+  async function showDashboard() {
     const container = document.createElement('section');
     container.className = 'section dashboard';
-    const stats = statsManager.getStats();
+    const stats = await statsManager.getStats();
     
     container.innerHTML = `
       <div>
@@ -370,10 +399,10 @@
       render(createStartView());
     });
     
-    container.querySelector('#reset-stats').addEventListener('click', () => {
+    container.querySelector('#reset-stats').addEventListener('click', async () => {
       if (confirm('Reset all session statistics? This cannot be undone.')) {
-        statsManager.reset();
-        render(createDashboardView()); // Refresh dashboard
+        await statsManager.reset();
+        showDashboard(); // Refresh dashboard
         showToast('Statistics reset successfully!');
       }
     });
@@ -383,7 +412,7 @@
       generateChart(stats);
     }, 10);
     
-    return container;
+    render(container);
   }
 
   function generateChart(stats) {
@@ -501,6 +530,7 @@
   async function init() {
     try {
       applyThemeFromPrefs();
+      statsManager.init();
       render(createStartView());
       await loadQuestionsFromExcel();
       quizState.loaded = true;
