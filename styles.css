@@ -17,6 +17,8 @@ body {
   font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
   background: radial-gradient(1200px 800px at 20% -10%, #1b1f2d 0%, #0f1115 55%), var(--bg);
   color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #app { min-height: 100%; display: flex; flex-direction: column; }
@@ -39,7 +41,7 @@ body {
 
 .app-footer { text-align: center; color: var(--muted); padding: 24px 0 40px; }
 
-button {
+button:not(.choice) {
   background: var(--brand);
   border: none;
   color: #1f1f1f;
@@ -50,21 +52,24 @@ button {
   transition: transform 0.06s ease, box-shadow 0.2s ease;
   box-shadow: 0 8px 20px rgba(245, 196, 81, 0.25);
 }
-button:hover { transform: translateY(-1px); }
-button:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(245,196,81,0.25); }
+button:not(.choice):hover { transform: translateY(-1px); }
+button:not(.choice):active { transform: translateY(0); box-shadow: 0 2px 8px rgba(245,196,81,0.25); }
 
 .choice {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
   padding: 14px 16px;
   border-radius: 12px;
   display: flex; align-items: center; justify-content: space-between;
   gap: 12px;
   cursor: pointer;
+  color: #ffffff;
+  font-size: 17px;
+  font-weight: 600;
 }
-.choice:hover { border-color: rgba(245,196,81,0.5); box-shadow: 0 0 0 4px var(--ring); }
-.choice.correct { border-color: rgba(34,197,94,0.7); box-shadow: 0 0 0 6px rgba(34,197,94,0.25); }
-.choice.wrong { border-color: rgba(239,68,68,0.7); box-shadow: 0 0 0 6px rgba(239,68,68,0.25); }
+.choice:hover { border-color: rgba(245,196,81,0.6); box-shadow: 0 0 0 2px var(--ring); }
+.choice.correct { border-color: rgba(34,197,94,0.9); box-shadow: 0 0 0 2px rgba(34,197,94,0.35); }
+.choice.wrong { border-color: rgba(239,68,68,0.9); box-shadow: 0 0 0 2px rgba(239,68,68,0.35); }
 
 .choices { display: grid; gap: 12px; margin-top: 16px; }
 
