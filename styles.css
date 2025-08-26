@@ -69,7 +69,7 @@ button:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(245,196,81,
 .choices { display: grid; gap: 12px; margin-top: 16px; }
 
 .lead { color: var(--muted); margin-bottom: 16px; }
-.heading { font-size: 22px; font-weight: 700; margin: 0 0 10px; }
+.heading { font-size: 26px; font-weight: 800; margin: 0 0 10px; color: #ffffff; letter-spacing: 0.2px; }
 
 .section { display: grid; gap: 16px; }
 
