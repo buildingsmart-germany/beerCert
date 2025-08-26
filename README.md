@@ -1,7 +1,7 @@
 BeerCert
 ========
 
-A playful, ironic quiz as a static web app. Questions are loaded from "questions.xlsx" and filtered by difficulty. Deployed via GitHub Pages.
+A playful, ironic quiz as a static web app, themed for the buildingSMART International Professional Certification — Summit Special (Berlin). It helps warm up minds for digitizing the built environment with openBIM and celebrates competence development.
 
 Features
 - Difficulty: Easy / Medium / Difficult
@@ -19,7 +19,8 @@ Structure
 
 Theme
 - Accessible, variable-based theming.
-- buildingSMART theme via: add `?theme=bsi` to the URL (persisted in localStorage).
+- buildingSMART theme is the default.
+- You can still force a theme via URL parameter `?theme=bsi` (persisted in localStorage).
 
 Excel format
 Expected columns (first sheet is read):

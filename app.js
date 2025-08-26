@@ -75,7 +75,7 @@
     container.className = 'section';
     container.innerHTML = `
       <div>
-        <p class="lead" data-tippy-content="Don't worry, we grade fairly.* *cough">Welcome to BeerCert!</p>
+        <p class="lead" data-tippy-content="A light-hearted teaser for the real thing: bSI Professional Certification.">Welcome to BeerCert — Summit Special</p>
         <h2 class="heading">Choose your difficulty</h2>
         <div class="difficulty" role="list">
           <button class="chip" data-diff="${Difficulty.EASY}" aria-label="Beginner" data-tippy-content="Easy: like lager in a sunny beer garden."><span>Easy</span></button>
@@ -83,7 +83,7 @@
           <button class="chip" data-diff="${Difficulty.HARD}" aria-label="Hard" data-tippy-content="Difficult: like reciting the Purity Law backwards."><span>Difficult</span></button>
         </div>
         <div class="spacer"></div>
-        <p class="hint">Questions are loaded from <code>questions.xlsx</code>. Excel was beer-motivated.</p>
+        <p class="hint">Questions are loaded from <code>questions.xlsx</code>. The aim: get into the spirit of digitizing the built environment with openBIM.</p>
         <p class="hint" id="loadStatus"></p>
       </div>
     `;
@@ -273,11 +273,11 @@
 
   function applyThemeFromPrefs() {
     const url = new URL(window.location.href);
-    const t = url.searchParams.get('theme') || localStorage.getItem('beerCertTheme') || '';
-    if (t) {
-      document.documentElement.setAttribute('data-theme', t);
-      localStorage.setItem('beerCertTheme', t);
-    }
+    const param = url.searchParams.get('theme');
+    const stored = localStorage.getItem('beerCertTheme');
+    const t = param || stored || 'bsi';
+    document.documentElement.setAttribute('data-theme', t);
+    localStorage.setItem('beerCertTheme', t);
   }
 
   function errorView(e) {
