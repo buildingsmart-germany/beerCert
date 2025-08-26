@@ -39,15 +39,15 @@
     container.className = 'section';
     container.innerHTML = `
       <div>
-        <p class="lead" data-tippy-content="Keine Sorge, wir bewerten fair.* *hust">Willkommen bei BeerCert!</p>
-        <h2 class="heading">Wähle deine Schwierigkeit</h2>
+        <p class="lead" data-tippy-content="Don't worry, we grade fairly.* *cough">Welcome to BeerCert!</p>
+        <h2 class="heading">Choose your difficulty</h2>
         <div class="difficulty" role="list">
-          <button class="chip" data-diff="${Difficulty.EASY}" aria-label="Einsteiger" data-tippy-content="Easy: wie Pils im Biergarten.">Easy</button>
-          <button class="chip" data-diff="${Difficulty.MEDIUM}" aria-label="Fortgeschritten" data-tippy-content="Medium: wie IPA blind verkosten.">Medium</button>
-          <button class="chip" data-diff="${Difficulty.HARD}" aria-label="Schwierig" data-tippy-content="Difficult: wie Reinheitsgebot rückwärts.">Difficult</button>
+          <button class="chip" data-diff="${Difficulty.EASY}" aria-label="Beginner" data-tippy-content="Easy: like lager in a sunny beer garden.">Easy</button>
+          <button class="chip" data-diff="${Difficulty.MEDIUM}" aria-label="Intermediate" data-tippy-content="Medium: like blind-tasting an IPA.">Medium</button>
+          <button class="chip" data-diff="${Difficulty.HARD}" aria-label="Hard" data-tippy-content="Difficult: like reciting the Purity Law backwards.">Difficult</button>
         </div>
         <div class="spacer"></div>
-        <p class="hint">Die Fragen kommen aus <code>questions.xlsx</code>. Keine Sorge, Excel wurde durch Bier motiviert.</p>
+        <p class="hint">Questions are loaded from <code>questions.xlsx</code>. Excel was beer-motivated.</p>
       </div>
     `;
     container.querySelectorAll('.chip').forEach((btn) => {
@@ -66,15 +66,15 @@
     container.innerHTML = `
       <div>
         <p class="lead inline">
-          <span>Schwierigkeit:</span>
+          <span>Difficulty:</span>
           <strong>${labelDifficulty(quizState.currentDifficulty)}</strong>
         </p>
-        <h2 class="heading" data-tippy-content="Du schaffst das. Vielleicht.">${escapeHtml(q.question)}</h2>
+        <h2 class="heading" data-tippy-content="You got this. Probably.">${escapeHtml(q.question)}</h2>
         <div class="choices"></div>
         <div class="divider"></div>
         <div class="inline">
-          <button id="again" data-tippy-content="Nochmal? Na klar, immer Durst.">Zurück zur Auswahl</button>
-          <span class="hint">Tipp: Antwort ohne Garantie, wie Craft-Bierpreise.</span>
+          <button id="again" data-tippy-content="Again? Sure, thirst never ends.">Back to selection</button>
+          <span class="hint">Hint: Answers come with no warranty, much like craft beer pricing.</span>
         </div>
       </div>
     `;
@@ -110,16 +110,15 @@
     if (isCorrect) {
       btn.classList.add('correct');
       triggerConfetti();
-      showToast('Richtig! Du darfst jetzt „Gewinn“ sagen und ein Bier holen.');
+      showToast('Correct! You may now say “win” and fetch a beer.');
       setTimeout(() => {
-        // nächste Runde
         render(createStartView());
       }, 1100);
     } else {
       btn.classList.add('wrong');
       const correctBtn = all.find(b => b.getAttribute('data-answer') === q.correct);
       if (correctBtn) correctBtn.classList.add('correct');
-      showToast('Upsi! Besser noch mal BeerCert machen. Oder erst lernen, dann trinken.');
+      showToast('Oops! Maybe take BeerCert again. Or learn first, then drink.');
       setTimeout(() => render(createStartView()), 1500);
     }
   }
@@ -145,13 +144,13 @@
 
   async function loadQuestionsFromExcel() {
     const resp = await fetch('questions.xlsx', { cache: 'no-store' });
-    if (!resp.ok) throw new Error('Konnte questions.xlsx nicht laden');
+    if (!resp.ok) throw new Error('Failed to load questions.xlsx');
     const arrayBuffer = await resp.arrayBuffer();
     const workbook = XLSX.read(arrayBuffer, { type: 'array' });
     const sheetName = workbook.SheetNames[0];
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-    // Erwartete Spalten: difficulty | category | question | correct | incorrect1 | incorrect2 | incorrect3
+    // Expected columns: difficulty | category | question | correct | incorrect1 | incorrect2 | incorrect3
     const normalized = rows.map((r) => ({
       difficulty: String(r.difficulty || r.Difficulty || r.schwierigkeit || '').toLowerCase().trim(),
       category: String(r.category || r.Category || r.kategorie || '').trim(),
@@ -173,7 +172,7 @@
       return qd === 'easy';
     });
     if (pool.length === 0) {
-      showToast('Keine Fragen für diese Schwierigkeit gefunden. Excel hat wohl Durst.');
+      showToast('No questions found for this difficulty. Excel seems thirsty.');
       render(createStartView());
       return;
     }
@@ -193,7 +192,7 @@
     try {
       render(createStartView());
       await loadQuestionsFromExcel();
-      showToast('Fragen geladen. Kein Schaum, nur Inhalt.');
+      showToast('Questions loaded. No foam, just content.');
     } catch (e) {
       console.error(e);
       render(errorView(e));
@@ -204,9 +203,9 @@
     const container = document.createElement('section');
     container.className = 'section';
     container.innerHTML = `
-      <h2 class="heading">Fehler beim Laden</h2>
-      <p class="lead">${escapeHtml(e.message || 'Unbekannter Fehler')}.</p>
-      <button id="retry">Nochmal versuchen</button>
+      <h2 class="heading">Load error</h2>
+      <p class="lead">${escapeHtml(e.message || 'Unknown error')}.</p>
+      <button id="retry">Try again</button>
     `;
     container.querySelector('#retry').addEventListener('click', init);
     return container;

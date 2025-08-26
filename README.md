@@ -1,24 +1,24 @@
 BeerCert
 ========
 
-Ein spielerisch-ironisches Quiz als statische Web-App. Fragen werden aus "questions.xlsx" geladen und nach Schwierigkeit gefiltert. Deployment via GitHub Pages.
+A playful, ironic quiz as a static web app. Questions are loaded from "questions.xlsx" and filtered by difficulty. Deployed via GitHub Pages.
 
 Features
-- Schwierigkeit: Easy / Medium / Difficult
-- Zufällige Frage aus Excel, Antworten gemischt
-- Treffer: Konfetti + augenzwinkernde Texte
-- Fehlversuch: freundliches "weiter lernen"
-- Tooltips (Tippy.js), modernes UI (Inter, Dark-Card-Design)
+- Difficulty: Easy / Medium / Difficult
+- Random question from Excel, shuffled answers
+- Correct: confetti + tongue-in-cheek messages
+- Wrong: friendly “learn more” vibes
+- Tooltips (Tippy.js), modern UI (Inter, dark card design)
 
-Struktur
-- index.html: Einstieg und Abhängigkeiten
-- styles.css: Look & Feel
-- app.js: Logik (Excel laden, filtern, darstellen)
-- questions.xlsx: Fragenkatalog (muss im Repo liegen)
-- .github/workflows/deploy.yml: GitHub Pages Workflow
+Structure
+- index.html: Entry point and dependencies
+- styles.css: Look & feel
+- app.js: Logic (load Excel, filter, render)
+- questions.xlsx: Question bank (must be in the repo)
+- .github/workflows/deploy.yml: GitHub Pages workflow
 
-Fragenformat (Excel)
-Erwartete Spalten (erste Tabelle/Sheet wird gelesen):
+Excel format
+Expected columns (first sheet is read):
 - difficulty (easy | medium | hard/difficult)
 - category (optional)
 - question
@@ -27,19 +27,19 @@ Erwartete Spalten (erste Tabelle/Sheet wird gelesen):
 - incorrect2
 - incorrect3
 
-Groß-/Kleinschreibung ist flexibel, alternative deutsche Spaltennamen (schwierigkeit, Frage, richtig) werden erkannt.
+Case-insensitive, alternative German column names (schwierigkeit, Frage, richtig) are accepted.
 
-Lokale Entwicklung
-Öffne index.html in einem statischen Server (wegen fetch):
+Local development
+Serve `index.html` via a static server (because of fetch):
 
-Python: python3 -m http.server 5173, dann http://localhost:5173 öffnen
+Python: python3 -m http.server 5173, then open http://localhost:5173
 
-Deployment auf GitHub Pages
-- Branch main pushen.
-- Unter Settings → Pages → Source: "GitHub Actions" wählen (falls noch nicht aktiv).
-- Workflow (.github/workflows/deploy.yml) veröffentlicht die Seite automatisch.
+Deploy on GitHub Pages
+- Push to branch main.
+- In Settings → Pages, ensure Source is “GitHub Actions”.
+- The workflow (.github/workflows/deploy.yml) publishes the site automatically.
 
-Lizenz
+License
 MIT
 
 
