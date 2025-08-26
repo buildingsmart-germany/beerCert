@@ -258,6 +258,7 @@
 
   async function init() {
     try {
+      applyThemeFromPrefs();
       render(createStartView());
       await loadQuestionsFromExcel();
       quizState.loaded = true;
@@ -267,6 +268,15 @@
     } catch (e) {
       console.error(e);
       render(errorView(e));
+    }
+  }
+
+  function applyThemeFromPrefs() {
+    const url = new URL(window.location.href);
+    const t = url.searchParams.get('theme') || localStorage.getItem('beerCertTheme') || '';
+    if (t) {
+      document.documentElement.setAttribute('data-theme', t);
+      localStorage.setItem('beerCertTheme', t);
     }
   }
 

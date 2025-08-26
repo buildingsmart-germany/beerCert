@@ -17,6 +17,10 @@ Structure
 - questions.xlsx: Question bank (must be in the repo)
 - .github/workflows/deploy.yml: GitHub Pages workflow
 
+Theme
+- Accessible, variable-based theming.
+- buildingSMART theme via: add `?theme=bsi` to the URL (persisted in localStorage).
+
 Excel format
 Expected columns (first sheet is read):
 - difficulty (easy | medium | hard/difficult)

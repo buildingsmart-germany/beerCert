@@ -3,11 +3,18 @@
   --card: #151822;
   --text: #e6e8ef;
   --muted: #9aa3b2;
-  --brand: #f5c451;
-  --accent: #7dd3fc;
+  --brand: #f5c451; /* default theme brand */
+  --accent: #7dd3fc; /* default theme accent */
   --ok: #22c55e;
   --nope: #ef4444;
   --ring: rgba(245, 196, 81, 0.4);
+}
+
+/* buildingSMART Professional Certification theme (accessible) */
+[data-theme="bsi"] {
+  --brand: #009FDA;  /* bSI blue */
+  --accent: #E6007E; /* bSI magenta */
+  --ring: rgba(0, 159, 218, 0.35);
 }
 
 * { box-sizing: border-box; }
