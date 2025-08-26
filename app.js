@@ -12,82 +12,107 @@
     currentView: 'start', // 'start' | 'question' | 'dashboard'
   };
 
-  // Statistics tracking system with robust cross-tab synchronization
+  // Global statistics tracking system for ALL users worldwide
   const statsManager = {
+    firebaseUrl: 'https://beercert-summit-default-rtdb.europe-west1.firebasedatabase.app/stats.json',
     storageKey: 'beerCertStats',
-    timestampKey: 'beerCertStatsTimestamp',
     cache: null,
-    lastUpdate: 0,
+    lastSync: 0,
+    syncInterval: 5000, // Sync every 5 seconds
     pollInterval: null,
     
     init() {
-      // Load initial stats
-      this.loadStats();
+      console.log('🌍 Initializing GLOBAL statistics system...');
       
-      // Multiple sync mechanisms for maximum compatibility
+      // Load initial stats from cloud
+      this.syncFromCloud();
       
-      // 1. Storage event listener (works in most cases)
-      window.addEventListener('storage', (e) => {
-        if (e.key === this.storageKey) {
-          this.loadStats();
-          console.log('📊 Stats updated via storage event:', this.cache);
-        }
-      });
-      
-      // 2. Polling fallback for browsers/environments where storage events don't work
+      // Regular cloud sync
       this.pollInterval = setInterval(() => {
-        this.checkForUpdates();
-      }, 2000); // Check every 2 seconds
+        this.syncFromCloud();
+      }, this.syncInterval);
       
-      // 3. Page visibility change sync (when user switches tabs)
+      // Sync when page becomes visible
       document.addEventListener('visibilitychange', () => {
         if (!document.hidden) {
-          this.checkForUpdates();
+          this.syncFromCloud();
         }
       });
       
-      // 4. Focus event sync (when user clicks on tab)
+      // Sync on window focus
       window.addEventListener('focus', () => {
-        this.checkForUpdates();
+        this.syncFromCloud();
       });
     },
     
-    checkForUpdates() {
+    async syncFromCloud() {
       try {
-        const timestampStr = localStorage.getItem(this.timestampKey);
-        const timestamp = timestampStr ? parseInt(timestampStr) : 0;
+        const response = await fetch(this.firebaseUrl, {
+          method: 'GET',
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
         
-        if (timestamp > this.lastUpdate) {
-          this.loadStats();
-          console.log('📊 Stats updated via polling:', this.cache);
+        if (response.ok) {
+          const data = await response.json();
+          const cloudStats = data || { totalAttempts: 0, beersEarned: 0, fails: 0 };
+          
+          // Update cache if data is newer or different
+          if (!this.cache || JSON.stringify(this.cache) !== JSON.stringify(cloudStats)) {
+            this.cache = cloudStats;
+            this.lastSync = Date.now();
+            
+            // Save to localStorage as backup
+            localStorage.setItem(this.storageKey, JSON.stringify(cloudStats));
+            
+            console.log('🌍 Global stats synced:', this.cache);
+            
+            // Update dashboard if visible
+            if (quizState.currentView === 'dashboard') {
+              setTimeout(() => this.refreshDashboard(), 100);
+            }
+          }
         }
       } catch (e) {
-        console.warn('📊 Failed to check for updates');
+        console.warn('🌍 Cloud sync failed, using local cache');
+        this.loadLocalFallback();
       }
     },
     
-    loadStats() {
+    loadLocalFallback() {
       try {
         const data = localStorage.getItem(this.storageKey);
-        const timestamp = localStorage.getItem(this.timestampKey);
-        
         this.cache = data ? JSON.parse(data) : { totalAttempts: 0, beersEarned: 0, fails: 0 };
-        this.lastUpdate = timestamp ? parseInt(timestamp) : Date.now();
+      } catch (e) {
+        this.cache = { totalAttempts: 0, beersEarned: 0, fails: 0 };
+      }
+    },
+    
+    async saveToCloud(stats) {
+      try {
+        const response = await fetch(this.firebaseUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(stats)
+        });
         
-        // Force UI update if dashboard is visible
-        if (quizState.currentView === 'dashboard') {
-          setTimeout(() => this.refreshDashboard(), 100);
+        if (response.ok) {
+          console.log('🌍 Global stats saved to cloud:', stats);
+          return true;
         }
       } catch (e) {
-        console.warn('📊 Failed to load stats, using defaults');
-        this.cache = { totalAttempts: 0, beersEarned: 0, fails: 0 };
-        this.lastUpdate = Date.now();
+        console.warn('🌍 Failed to save to cloud:', e.message);
       }
+      
+      return false;
     },
     
     refreshDashboard() {
       const existingChart = document.getElementById('session-chart');
-      if (existingChart) {
+      if (existingChart && this.cache) {
         generateChart(this.cache);
         
         // Update stat numbers
@@ -101,66 +126,73 @@
     },
     
     getStats() {
-      // Always check for fresh data when requested
-      this.checkForUpdates();
-      if (!this.cache) this.loadStats();
+      if (!this.cache) {
+        this.loadLocalFallback();
+      }
       return { ...this.cache };
     },
     
-    saveStats(stats) {
-      const timestamp = Date.now();
-      
-      this.cache = { ...stats };
-      this.lastUpdate = timestamp;
-      
-      // Save data and timestamp
-      localStorage.setItem(this.storageKey, JSON.stringify(stats));
-      localStorage.setItem(this.timestampKey, timestamp.toString());
-      
-      console.log('📊 Stats saved:', this.cache, 'at', new Date(timestamp).toLocaleTimeString());
-      
-      // Trigger storage event manually for better compatibility
-      try {
-        window.dispatchEvent(new StorageEvent('storage', {
-          key: this.storageKey,
-          newValue: JSON.stringify(stats),
-          oldValue: null,
-          url: window.location.href,
-          storageArea: localStorage
-        }));
-      } catch (e) {
-        console.warn('📊 Could not dispatch storage event');
-      }
-    },
-    
-    incrementAttempts() {
-      const currentStats = this.getStats();
-      const newStats = { ...currentStats };
+    async incrementAttempts() {
+      await this.syncFromCloud(); // Get latest before incrementing
+      const newStats = { ...this.cache };
       newStats.totalAttempts++;
-      this.saveStats(newStats);
-      console.log('📊 Incremented attempts:', newStats.totalAttempts);
+      
+      // Optimistic update
+      this.cache = newStats;
+      localStorage.setItem(this.storageKey, JSON.stringify(newStats));
+      
+      // Save to cloud in background
+      this.saveToCloud(newStats);
+      
+      console.log('🌍 Incremented global attempts:', newStats.totalAttempts);
     },
     
-    incrementBeers() {
-      const currentStats = this.getStats();
-      const newStats = { ...currentStats };
+    async incrementBeers() {
+      await this.syncFromCloud(); // Get latest before incrementing
+      const newStats = { ...this.cache };
       newStats.beersEarned++;
-      this.saveStats(newStats);
-      console.log('📊 Incremented beers:', newStats.beersEarned);
+      
+      // Optimistic update
+      this.cache = newStats;
+      localStorage.setItem(this.storageKey, JSON.stringify(newStats));
+      
+      // Save to cloud in background
+      this.saveToCloud(newStats);
+      
+      console.log('🌍 Incremented global beers:', newStats.beersEarned);
     },
     
-    incrementFails() {
-      const currentStats = this.getStats();
-      const newStats = { ...currentStats };
+    async incrementFails() {
+      await this.syncFromCloud(); // Get latest before incrementing
+      const newStats = { ...this.cache };
       newStats.fails++;
-      this.saveStats(newStats);
-      console.log('📊 Incremented fails:', newStats.fails);
+      
+      // Optimistic update
+      this.cache = newStats;
+      localStorage.setItem(this.storageKey, JSON.stringify(newStats));
+      
+      // Save to cloud in background
+      this.saveToCloud(newStats);
+      
+      console.log('🌍 Incremented global fails:', newStats.fails);
     },
     
-    reset() {
+    async reset() {
       const resetStats = { totalAttempts: 0, beersEarned: 0, fails: 0 };
-      this.saveStats(resetStats);
-      console.log('📊 Stats reset');
+      
+      // Update cache and local storage
+      this.cache = resetStats;
+      localStorage.setItem(this.storageKey, JSON.stringify(resetStats));
+      
+      // Save to cloud
+      await this.saveToCloud(resetStats);
+      
+      console.log('🌍 Global stats reset');
+      
+      // Refresh dashboard if visible
+      if (quizState.currentView === 'dashboard') {
+        setTimeout(() => this.refreshDashboard(), 100);
+      }
     },
     
     destroy() {
@@ -261,7 +293,7 @@
       btn.addEventListener('click', () => {
         quizState.currentDifficulty = btn.dataset.diff;
         quizState.attemptsLeft = quizState.maxAttempts; // Reset attempts
-        statsManager.incrementAttempts(); // Track new attempt (non-blocking)
+        statsManager.incrementAttempts(); // Track new attempt globally
         pickAndShowQuestion();
       });
     });
@@ -338,7 +370,7 @@
       showResultOverlay('correct');
       triggerBeerCheersAnimation();
       triggerConfetti();
-      statsManager.incrementBeers(); // Track successful beer earning (non-blocking)
+      statsManager.incrementBeers(); // Track successful beer earning globally
       showToast('Correct! You may now say "win" and fetch a beer.');
       setTimeout(() => {
         render(createStartView());
@@ -358,7 +390,7 @@
           pickAndShowQuestion();
         }, 1500);
       } else {
-        statsManager.incrementFails(); // Track final failure (non-blocking)
+        statsManager.incrementFails(); // Track final failure globally
         showToast('All attempts used. Time to practice more before enjoying that cold drink!');
         showFinalFailAnimation();
         setTimeout(() => render(createStartView()), 2500);
@@ -448,7 +480,7 @@
     container.innerHTML = `
       <div>
         <div class="dashboard-header">
-          <h2 class="heading">📊 Session Dashboard</h2>
+          <h2 class="heading">🌍 Global Summit Dashboard</h2>
           <div class="dashboard-actions">
             <button id="reset-stats" class="reset-btn" data-tippy-content="Reset all statistics">🔄 Reset</button>
             <button id="back-to-quiz" data-tippy-content="Back to the quiz">← Back</button>
@@ -482,8 +514,11 @@
         </div>
         
         <div class="chart-container">
-          <h3 class="chart-title">Session Histogram</h3>
+          <h3 class="chart-title">Global Summit Histogram</h3>
           <div class="chart" id="session-chart"></div>
+          <p class="hint" style="text-align: center; margin-top: 16px; opacity: 0.8;">
+            🌍 Live data from all participants worldwide
+          </p>
         </div>
       </div>
     `;
