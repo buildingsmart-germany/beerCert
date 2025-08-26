@@ -7,6 +7,8 @@
     currentDifficulty: null,
     currentQuestion: null,
     loaded: false,
+    attemptsLeft: 3,
+    maxAttempts: 3,
   };
 
   const Difficulty = {
@@ -96,6 +98,7 @@
     container.querySelectorAll('.chip').forEach((btn) => {
       btn.addEventListener('click', () => {
         quizState.currentDifficulty = btn.dataset.diff;
+        quizState.attemptsLeft = quizState.maxAttempts; // Reset attempts
         pickAndShowQuestion();
       });
     });
@@ -108,10 +111,16 @@
     const answers = shuffle([q.correct, ...q.incorrect]);
     container.innerHTML = `
       <div>
-        <p class="lead inline">
-          <span>Difficulty:</span>
-          <strong>${labelDifficulty(quizState.currentDifficulty)}</strong>
-        </p>
+        <div class="question-header">
+          <div class="inline">
+            <span class="lead">Difficulty:</span>
+            <strong class="difficulty-badge">${labelDifficulty(quizState.currentDifficulty)}</strong>
+          </div>
+          <div class="attempts-counter">
+            <span class="attempts-label">Attempts remaining:</span>
+            <span class="attempts-count">${quizState.attemptsLeft}</span>
+          </div>
+        </div>
         <h2 class="heading" data-tippy-content="You got this. Probably.">${escapeHtml(q.question)}</h2>
         <div class="choices"></div>
         <div class="divider"></div>
@@ -150,9 +159,11 @@
     all.forEach(b => b.disabled = true);
     const chosen = btn.getAttribute('data-answer');
     const isCorrect = chosen === q.correct;
+    
     if (isCorrect) {
       btn.classList.add('correct');
       showResultOverlay('correct');
+      triggerBeerCheersAnimation();
       triggerConfetti();
       showToast('Correct! You may now say "win" and fetch a beer.');
       setTimeout(() => {
@@ -163,8 +174,26 @@
       const correctBtn = all.find(b => b.getAttribute('data-answer') === q.correct);
       if (correctBtn) correctBtn.classList.add('correct');
       showResultOverlay('wrong');
-      showToast('Oops! Maybe take BeerCert again. Or learn first, then drink.');
-      setTimeout(() => render(createStartView()), 1500);
+      
+      quizState.attemptsLeft--;
+      
+      if (quizState.attemptsLeft > 0) {
+        showToast(`Wrong answer. ${quizState.attemptsLeft} attempt(s) remaining. Try again!`);
+        setTimeout(() => {
+          // Re-enable choices and update counter
+          all.forEach(b => {
+            b.disabled = false;
+            b.classList.remove('wrong', 'correct');
+          });
+          // Update attempts counter in UI
+          const counter = document.querySelector('.attempts-count');
+          if (counter) counter.textContent = quizState.attemptsLeft;
+        }, 1200);
+      } else {
+        showToast('All attempts used. Time to practice more before enjoying that cold drink!');
+        showFinalFailAnimation();
+        setTimeout(() => render(createStartView()), 2500);
+      }
     }
   }
 
@@ -179,6 +208,40 @@
     setTimeout(() => {
       overlay.className = 'result-overlay';
     }, 800);
+  }
+
+  function triggerBeerCheersAnimation() {
+    // Create floating beer cheers animation
+    const cheers = document.createElement('div');
+    cheers.className = 'beer-cheers-animation';
+    cheers.innerHTML = '🍻';
+    document.body.appendChild(cheers);
+    
+    setTimeout(() => {
+      if (cheers.parentNode) {
+        cheers.parentNode.removeChild(cheers);
+      }
+    }, 2000);
+  }
+
+  function showFinalFailAnimation() {
+    // Professional "practice more" animation
+    const failMsg = document.createElement('div');
+    failMsg.className = 'final-fail-animation';
+    failMsg.innerHTML = `
+      <div class="fail-content">
+        <div class="fail-icon">📚</div>
+        <h3>Time to Practice!</h3>
+        <p>Please line up again and study the materials<br>before enjoying your well-earned refreshment.</p>
+      </div>
+    `;
+    document.body.appendChild(failMsg);
+    
+    setTimeout(() => {
+      if (failMsg.parentNode) {
+        failMsg.parentNode.removeChild(failMsg);
+      }
+    }, 2000);
   }
 
   function triggerConfetti() {
