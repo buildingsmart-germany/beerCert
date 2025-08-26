@@ -124,7 +124,7 @@
         <h2 class="heading" data-tippy-content="You got this. Probably.">${escapeHtml(q.question)}</h2>
         <div class="choices"></div>
         <div class="divider"></div>
-        <div class="inline">
+        <div class="question-footer">
           <button id="again" data-tippy-content="Again? Sure, thirst never ends.">Back to selection</button>
           <span class="hint">Hint: Answers come with no warranty, much like craft beer pricing.</span>
         </div>
@@ -178,17 +178,11 @@
       quizState.attemptsLeft--;
       
       if (quizState.attemptsLeft > 0) {
-        showToast(`Wrong answer. ${quizState.attemptsLeft} attempt(s) remaining. Try again!`);
+        showToast(`Wrong answer. ${quizState.attemptsLeft} attempt(s) remaining. New question coming!`);
         setTimeout(() => {
-          // Re-enable choices and update counter
-          all.forEach(b => {
-            b.disabled = false;
-            b.classList.remove('wrong', 'correct');
-          });
-          // Update attempts counter in UI
-          const counter = document.querySelector('.attempts-count');
-          if (counter) counter.textContent = quizState.attemptsLeft;
-        }, 1200);
+          // Show new question instead of re-enabling same choices
+          pickAndShowQuestion();
+        }, 1500);
       } else {
         showToast('All attempts used. Time to practice more before enjoying that cold drink!');
         showFinalFailAnimation();
