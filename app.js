@@ -27,6 +27,29 @@
     return '';
   }
 
+  function normalizeRowKeys(row) {
+    const normalized = {};
+    Object.keys(row).forEach((key) => {
+      const norm = String(key)
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+      normalized[norm] = row[key];
+    });
+    return normalized;
+  }
+
+  function pickBySynonyms(obj, synonyms) {
+    for (const syn of synonyms) {
+      const exact = syn.toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(obj, exact)) return obj[exact];
+      // also try contains (for cases like "difficulty level")
+      const key = Object.keys(obj).find(k => k.includes(exact));
+      if (key) return obj[key];
+    }
+    return '';
+  }
+
   function showToast(message) {
     let el = document.querySelector('.toast');
     if (!el) {
@@ -171,37 +194,25 @@
     const sheet = workbook.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
     // Expected columns: difficulty | category | question | correct | incorrect1 | incorrect2 | incorrect3
-    const normalized = rows.map((r) => {
-      // Normalize keys access (support various header styles)
-      const diffRaw = r.difficulty ?? r.Difficulty ?? r['Difficulty'] ?? r['Difficulty Level'] ?? r.schwierigkeit ?? r.Schwierigkeit ?? '';
+    const normalized = rows.map((rawRow) => {
+      const row = normalizeRowKeys(rawRow);
+      const diffRaw = pickBySynonyms(row, ['difficulty level', 'difficulty', 'schwierigkeit']);
       const mapped = canonicalizeDifficulty(diffRaw);
-      const question = r.question ?? r.Question ?? r['Frage'] ?? r['question'] ?? '';
-      const correct = r.correct ?? r.Correct ?? r['Correct'] ?? r['Correct Answer'] ?? r['richtig'] ?? r['Richtig'] ?? '';
+      const question = pickBySynonyms(row, ['question', 'frage']);
+      const correct = pickBySynonyms(row, ['correct answer', 'correct', 'richtig']);
 
-      // Collect incorrect options from a variety of headers
-      const incorrectCandidates = [];
-      const keys = Object.keys(r);
-      keys.forEach((k) => {
-        const lower = String(k).toLowerCase();
-        if (lower.includes('incorrect')) {
-          const val = r[k];
-          if (val !== undefined && String(val).trim() !== '') incorrectCandidates.push(String(val).trim());
-        }
-      });
-      // Also consider specific common names
-      const specificIncorrect = [
-        r.incorrect1, r.incorrect2, r.incorrect3,
-        r.Incorrect1, r.Incorrect2, r.Incorrect3,
-        r['Incorrect Option A'], r['Incorrect Option B'], r['Incorrect Option C']
-      ].filter(v => v !== undefined && String(v).trim() !== '').map(v => String(v).trim());
-      const incorrect = Array.from(new Set([ ...incorrectCandidates, ...specificIncorrect ]));
+      // Collect all incorrect values by any header that contains 'incorrect'
+      const incorrect = Object.keys(row)
+        .filter(k => k.includes('incorrect'))
+        .map(k => String(row[k] || '').trim())
+        .filter(v => v.length > 0);
 
       return {
         difficulty: mapped,
-        category: String(r.category || r.Category || r.kategorie || r.Kategorie || '').trim(),
-        question: String(question).trim(),
-        correct: String(correct).trim(),
-        incorrect
+        category: String(pickBySynonyms(row, ['category', 'kategorie']) || '').trim(),
+        question: String(question || '').trim(),
+        correct: String(correct || '').trim(),
+        incorrect: Array.from(new Set(incorrect)),
       };
     }).filter(q => q.question && q.correct && q.incorrect.length > 0);
     quizState.allQuestions = normalized;
