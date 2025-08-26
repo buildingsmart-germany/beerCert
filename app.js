@@ -6,6 +6,7 @@
     allQuestions: [],
     currentDifficulty: null,
     currentQuestion: null,
+    loaded: false,
   };
 
   const Difficulty = {
@@ -42,14 +43,21 @@
         <p class="lead" data-tippy-content="Don't worry, we grade fairly.* *cough">Welcome to BeerCert!</p>
         <h2 class="heading">Choose your difficulty</h2>
         <div class="difficulty" role="list">
-          <button class="chip" data-diff="${Difficulty.EASY}" aria-label="Beginner" data-tippy-content="Easy: like lager in a sunny beer garden.">Easy</button>
-          <button class="chip" data-diff="${Difficulty.MEDIUM}" aria-label="Intermediate" data-tippy-content="Medium: like blind-tasting an IPA.">Medium</button>
-          <button class="chip" data-diff="${Difficulty.HARD}" aria-label="Hard" data-tippy-content="Difficult: like reciting the Purity Law backwards.">Difficult</button>
+          <button class="chip" data-diff="${Difficulty.EASY}" aria-label="Beginner" data-tippy-content="Easy: like lager in a sunny beer garden."><span>Easy</span></button>
+          <button class="chip" data-diff="${Difficulty.MEDIUM}" aria-label="Intermediate" data-tippy-content="Medium: like blind-tasting an IPA."><span>Medium</span></button>
+          <button class="chip" data-diff="${Difficulty.HARD}" aria-label="Hard" data-tippy-content="Difficult: like reciting the Purity Law backwards."><span>Difficult</span></button>
         </div>
         <div class="spacer"></div>
         <p class="hint">Questions are loaded from <code>questions.xlsx</code>. Excel was beer-motivated.</p>
+        <p class="hint" id="loadStatus"></p>
       </div>
     `;
+    const status = container.querySelector('#loadStatus');
+    const chips = Array.from(container.querySelectorAll('.chip'));
+    if (!quizState.loaded) {
+      chips.forEach((b) => (b.disabled = true));
+      status.textContent = 'Loading questions…';
+    }
     container.querySelectorAll('.chip').forEach((btn) => {
       btn.addEventListener('click', () => {
         quizState.currentDifficulty = btn.dataset.diff;
@@ -192,7 +200,10 @@
     try {
       render(createStartView());
       await loadQuestionsFromExcel();
+      quizState.loaded = true;
       showToast('Questions loaded. No foam, just content.');
+      // Re-render to enable buttons and show status
+      render(createStartView());
     } catch (e) {
       console.error(e);
       render(errorView(e));
