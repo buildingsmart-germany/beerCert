@@ -845,62 +845,109 @@
               <span class="live-dot pulsing"></span>LIVE
             </div>
           </div>
+          <!--
           <div class="backend-status">
             <span class="backend-indicator ${statsManager.activeBackend ? 'connected' : 'offline'}">
               ${statsManager.activeBackend ? '🟢 Connected to ' + statsManager.activeBackend.name : '🔴 Offline Mode'}
             </span>
             <div id="sync-status" class="sync-status">🔄 Syncing...</div>
           </div>
+          -->
           <div class="dashboard-actions">
             <button id="reset-stats" class="reset-btn" data-tippy-content="Reset all statistics">🔄 Reset</button>
             <button id="back-to-quiz" data-tippy-content="Back to the quiz">← Back</button>
           </div>
         </div>
         
-        <div class="stats-grid">
-          <div class="stat-card total">
-            <div class="stat-icon">🎯</div>
-            <div class="stat-content">
-              <div class="stat-number">${stats.totalAttempts}</div>
-              <div class="stat-label">Total Attempts</div>
+        <div class="layout-controls">
+          <div class="layout-toggle-container">
+            <span class="toggle-label">Layout Mode</span>
+            <div class="toggle-switch" id="layout-toggle" data-mode="grid">
+              <div class="toggle-track">
+                <div class="toggle-thumb"></div>
+                <div class="toggle-options">
+                  <span class="toggle-option" data-mode="grid">📐 Grid</span>
+                  <span class="toggle-option active" data-mode="stack">📋 Stack</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <span class="layout-hint">Drag widgets using the ⋮⋮ handle to rearrange</span>
+        </div>
+        
+        <div class="dashboard-grid" id="dashboard-grid" data-layout="grid">
+          <div class="dashboard-widget" data-widget="stats" data-position="0" data-span="1">
+            <div class="widget-header">
+              <span class="widget-title">📊 Statistics Overview</span>
+              <div class="widget-controls">
+                <button class="span-toggle" title="Toggle full width" data-widget-target="stats">⤢</button>
+                <button class="drag-handle" title="Hold and drag to move">⋮⋮</button>
+              </div>
+            </div>
+            <div class="stats-grid">
+              <div class="stat-card total">
+                <div class="stat-icon">🎯</div>
+                <div class="stat-content">
+                  <div class="stat-number">${stats.totalAttempts}</div>
+                  <div class="stat-label">Total Attempts</div>
+                </div>
+              </div>
+              
+              <div class="stat-card success">
+                <div class="stat-icon">🍺</div>
+                <div class="stat-content">
+                  <div class="stat-number">${stats.beersEarned}</div>
+                  <div class="stat-label">Beers Earned</div>
+                </div>
+              </div>
+              
+              <div class="stat-card fail">
+                <div class="stat-icon">😢</div>
+                <div class="stat-content">
+                  <div class="stat-number">${stats.fails}</div>
+                  <div class="stat-label">Practice Needed</div>
+                </div>
+              </div>
             </div>
           </div>
           
-          <div class="stat-card success">
-            <div class="stat-icon">🍺</div>
-            <div class="stat-content">
-              <div class="stat-number">${stats.beersEarned}</div>
-              <div class="stat-label">Beers Earned</div>
+          <div class="dashboard-widget" data-widget="histogram" data-position="1" data-span="1">
+            <div class="widget-header">
+              <span class="widget-title">📈 Global Summit Histogram</span>
+              <div class="widget-controls">
+                <button class="span-toggle" title="Toggle full width" data-widget-target="histogram">⤢</button>
+                <button class="drag-handle" title="Hold and drag to move">⋮⋮</button>
+              </div>
+            </div>
+            <div class="chart-container">
+              <div class="chart" id="session-chart"></div>
+              <!--
+              <p class="hint" style="text-align: center; margin-top: 16px; opacity: 0.8;">
+                🌍 Live data from all participants worldwide ${statsManager.activeBackend ? '• Connected to ' + statsManager.activeBackend.name : '• Offline mode'}
+              </p>
+              -->
             </div>
           </div>
           
-          <div class="stat-card fail">
-            <div class="stat-icon">😢</div>
-            <div class="stat-content">
-              <div class="stat-number">${stats.fails}</div>
-              <div class="stat-label">Practice Needed</div>
+          <div class="dashboard-widget" data-widget="progress" data-position="2" data-span="1">
+            <div class="widget-header">
+              <span class="widget-title">🍺 Drink Distribution Progress</span>
+              <div class="widget-header-controls">
+                <div class="limit-settings">
+                  <label for="drink-limit" class="limit-label">Limit:</label>
+                  <input type="number" id="drink-limit" class="limit-input" value="${statsManager.drinkLimit}" min="1" max="9999" />
+                  <button id="update-limit" class="limit-btn">Update</button>
+                </div>
+              </div>
+              <div class="widget-controls">
+                <button class="span-toggle" title="Toggle full width" data-widget-target="progress">⤢</button>
+                <button class="drag-handle" title="Hold and drag to move">⋮⋮</button>
+              </div>
             </div>
+            <div class="progress-chart" id="progress-chart"></div>
           </div>
-        </div>
-        
-        <div class="chart-container">
-          <h3 class="chart-title">Global Summit Histogram</h3>
-          <div class="chart" id="session-chart"></div>
-          <p class="hint" style="text-align: center; margin-top: 16px; opacity: 0.8;">
-            🌍 Live data from all participants worldwide ${statsManager.activeBackend ? '• Connected to ' + statsManager.activeBackend.name : '• Offline mode'}
-          </p>
-        </div>
-        
-        <div class="progress-section">
-          <div class="progress-header">
-            <h3 class="chart-title">🍺 Drink Distribution Progress</h3>
-            <div class="limit-settings">
-              <label for="drink-limit" class="limit-label">Limit:</label>
-              <input type="number" id="drink-limit" class="limit-input" value="${statsManager.drinkLimit}" min="1" max="9999" />
-              <button id="update-limit" class="limit-btn">Update</button>
-            </div>
-          </div>
-          <div class="progress-chart" id="progress-chart"></div>
+          
+          <!-- Drop zones will be added dynamically -->
         </div>
       </div>
     `;
@@ -935,6 +982,20 @@
       }
     });
     
+    // Layout toggle handler
+    container.querySelector('#layout-toggle').addEventListener('click', () => {
+      toggleDashboardLayout();
+    });
+    
+    // Span toggle handlers
+    container.querySelectorAll('.span-toggle').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const widgetType = btn.getAttribute('data-widget-target');
+        toggleWidgetSpan(widgetType);
+      });
+    });
+    
     // Generate charts after DOM insertion
     setTimeout(() => {
       generateChart(stats); // Initial chart creation
@@ -943,9 +1004,372 @@
       statsManager.startDashboardUpdates();
       statsManager.updateSyncStatus();
       statsManager.updateLiveStatus();
+      // Initialize grid layout system
+      initializeGridLayout();
     }, 10);
     
     render(container);
+  }
+
+  function toggleDashboardLayout() {
+    const grid = document.getElementById('dashboard-grid');
+    const toggle = document.getElementById('layout-toggle');
+    if (!grid || !toggle) return;
+    
+    const currentLayout = grid.getAttribute('data-layout');
+    const newLayout = currentLayout === 'grid' ? 'stack' : 'grid';
+    
+    // Update grid layout
+    grid.setAttribute('data-layout', newLayout);
+    
+    // Update toggle visual state
+    toggle.setAttribute('data-mode', newLayout);
+    
+    // Update toggle options
+    const options = toggle.querySelectorAll('.toggle-option');
+    options.forEach(option => {
+      option.classList.toggle('active', option.getAttribute('data-mode') === newLayout);
+    });
+    
+    // Reorder widgets sequentially
+    const widgets = Array.from(grid.querySelectorAll('.dashboard-widget'));
+    widgets.forEach((widget, index) => {
+      widget.setAttribute('data-position', index.toString());
+      widget.style.order = index;
+    });
+    
+    // Update span buttons visibility
+    updateSpanButtonsVisibility(newLayout);
+    
+    // Apply grid positioning
+    applyGridLayout();
+    
+    // Clear any drop zones
+    clearDropZones();
+    
+    localStorage.setItem('dashboardLayoutMode', newLayout);
+    console.log('📐 Layout mode changed to:', newLayout);
+  }
+
+  function toggleWidgetSpan(widgetType) {
+    const widget = document.querySelector(`[data-widget="${widgetType}"]`);
+    if (!widget) return;
+    
+    const currentSpan = widget.getAttribute('data-span') || '1';
+    const newSpan = currentSpan === '1' ? '2' : '1';
+    
+    widget.setAttribute('data-span', newSpan);
+    
+    // Update button visual state
+    const btn = widget.querySelector('.span-toggle');
+    if (btn) {
+      btn.textContent = newSpan === '2' ? '⤡' : '⤢';
+      btn.title = newSpan === '2' ? 'Make single width' : 'Toggle full width';
+      btn.classList.toggle('active', newSpan === '2');
+    }
+    
+    // Apply new grid layout
+    applyGridLayout();
+    
+    // Save to localStorage
+    saveGridLayout();
+    
+    console.log(`📐 Widget ${widgetType} span changed to: ${newSpan}`);
+  }
+
+  function updateSpanButtonsVisibility(layout) {
+    const spanButtons = document.querySelectorAll('.span-toggle');
+    spanButtons.forEach(btn => {
+      // Show span buttons only in grid mode
+      btn.style.display = layout === 'grid' ? 'flex' : 'none';
+    });
+  }
+
+  function applyGridLayout() {
+    const grid = document.getElementById('dashboard-grid');
+    if (!grid) return;
+    
+    const layout = grid.getAttribute('data-layout');
+    const widgets = grid.querySelectorAll('.dashboard-widget');
+    
+    if (layout === 'stack') {
+      // Stack mode: simple flex layout, ignore spans
+      widgets.forEach((widget, index) => {
+        widget.style.gridColumn = '';
+        widget.style.order = index;
+      });
+    } else {
+      // Grid mode: apply spans and auto-flow
+      widgets.forEach(widget => {
+        const span = widget.getAttribute('data-span') || '1';
+        widget.style.gridColumn = span === '2' ? 'span 2' : 'span 1';
+        widget.style.order = '';
+      });
+    }
+  }
+
+  function initializeGridLayout() {
+    const grid = document.getElementById('dashboard-grid');
+    if (!grid) return;
+    
+    let draggedWidget = null;
+    let dragStartY = 0;
+    let isDragging = false;
+    
+    // Load saved layout
+    loadGridLayout();
+    
+    // Setup drag handles
+    const dragHandles = grid.querySelectorAll('.drag-handle');
+    dragHandles.forEach(handle => {
+      handle.addEventListener('mousedown', startDrag);
+      handle.addEventListener('touchstart', startDrag, { passive: false });
+    });
+    
+    function startDrag(e) {
+      e.preventDefault();
+      
+      draggedWidget = e.target.closest('.dashboard-widget');
+      if (!draggedWidget) return;
+      
+      const clientY = e.clientY || e.touches[0].clientY;
+      dragStartY = clientY;
+      isDragging = false;
+      
+      // Add global mouse/touch event listeners
+      document.addEventListener('mousemove', onDrag);
+      document.addEventListener('mouseup', endDrag);
+      document.addEventListener('touchmove', onDrag, { passive: false });
+      document.addEventListener('touchend', endDrag);
+    }
+    
+    function onDrag(e) {
+      if (!draggedWidget) return;
+      
+      const clientY = e.clientY || e.touches[0].clientY;
+      const deltaY = Math.abs(clientY - dragStartY);
+      
+      // Start dragging only after moving 10px
+      if (!isDragging && deltaY > 10) {
+        isDragging = true;
+        draggedWidget.classList.add('dragging');
+        createDropZones();
+      }
+      
+      if (isDragging) {
+        e.preventDefault();
+        highlightNearestDropZone(clientY);
+      }
+    }
+    
+    function endDrag(e) {
+      if (!draggedWidget || !isDragging) {
+        // Clean up without moving
+        draggedWidget = null;
+        isDragging = false;
+        document.removeEventListener('mousemove', onDrag);
+        document.removeEventListener('mouseup', endDrag);
+        document.removeEventListener('touchmove', onDrag);
+        document.removeEventListener('touchend', endDrag);
+        return;
+      }
+      
+      const clientY = e.clientY || e.changedTouches?.[0]?.clientY;
+      const targetPosition = findNearestPosition(clientY);
+      
+      if (targetPosition !== null) {
+        moveWidgetToPosition(draggedWidget, targetPosition);
+      }
+      
+      // Clean up
+      draggedWidget.classList.remove('dragging');
+      clearDropZones();
+      
+      draggedWidget = null;
+      isDragging = false;
+      document.removeEventListener('mousemove', onDrag);
+      document.removeEventListener('mouseup', endDrag);
+      document.removeEventListener('touchmove', onDrag);
+      document.removeEventListener('touchend', endDrag);
+      
+      saveGridLayout();
+    }
+  }
+  
+  function createDropZones() {
+    clearDropZones();
+    
+    const grid = document.getElementById('dashboard-grid');
+    const widgets = grid.querySelectorAll('.dashboard-widget:not(.dragging)');
+    
+    widgets.forEach((widget, index) => {
+      // Create drop zone before each widget
+      const dropZone = document.createElement('div');
+      dropZone.className = 'drop-zone active';
+      dropZone.setAttribute('data-position', index.toString());
+      dropZone.textContent = 'Drop here';
+      
+      grid.insertBefore(dropZone, widget);
+    });
+    
+    // Add final drop zone at the end
+    const finalDropZone = document.createElement('div');
+    finalDropZone.className = 'drop-zone active';
+    finalDropZone.setAttribute('data-position', widgets.length.toString());
+    finalDropZone.textContent = 'Drop here';
+    grid.appendChild(finalDropZone);
+  }
+  
+  function clearDropZones() {
+    const dropZones = document.querySelectorAll('.drop-zone');
+    dropZones.forEach(zone => zone.remove());
+  }
+  
+  function highlightNearestDropZone(y) {
+    const dropZones = document.querySelectorAll('.drop-zone');
+    let nearestZone = null;
+    let minDistance = Infinity;
+    
+    dropZones.forEach(zone => {
+      zone.classList.remove('highlight');
+      const rect = zone.getBoundingClientRect();
+      const distance = Math.abs(rect.top + rect.height / 2 - y);
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestZone = zone;
+      }
+    });
+    
+    if (nearestZone) {
+      nearestZone.classList.add('highlight');
+    }
+  }
+  
+  function findNearestPosition(y) {
+    const dropZones = document.querySelectorAll('.drop-zone');
+    let nearestPosition = null;
+    let minDistance = Infinity;
+    
+    dropZones.forEach(zone => {
+      const rect = zone.getBoundingClientRect();
+      const distance = Math.abs(rect.top + rect.height / 2 - y);
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestPosition = parseInt(zone.getAttribute('data-position'));
+      }
+    });
+    
+    return nearestPosition;
+  }
+  
+  function moveWidgetToPosition(widget, newPosition) {
+    const grid = document.getElementById('dashboard-grid');
+    const widgets = Array.from(grid.querySelectorAll('.dashboard-widget'));
+    const currentPosition = parseInt(widget.getAttribute('data-position'));
+    
+    // Remove widget from current position
+    widgets.splice(currentPosition, 1);
+    
+    // Insert at new position
+    widgets.splice(newPosition, 0, widget);
+    
+    // Update all positions and reorder in DOM
+    widgets.forEach((w, index) => {
+      w.setAttribute('data-position', index.toString());
+      w.style.order = index;
+      grid.appendChild(w); // This moves it to the end, but order CSS will position it correctly
+    });
+    
+    console.log('📍 Moved widget to position:', newPosition);
+  }
+  
+  function saveGridLayout() {
+    const widgets = document.querySelectorAll('.dashboard-widget');
+    const layout = [];
+    const spans = {};
+    
+    widgets.forEach(widget => {
+      const widgetType = widget.getAttribute('data-widget');
+      const position = parseInt(widget.getAttribute('data-position'));
+      const span = widget.getAttribute('data-span') || '1';
+      
+      layout[position] = widgetType;
+      spans[widgetType] = span;
+    });
+    
+    const grid = document.getElementById('dashboard-grid');
+    const layoutMode = grid?.getAttribute('data-layout') || 'grid';
+    
+    localStorage.setItem('dashboardGridLayout', JSON.stringify(layout));
+    localStorage.setItem('dashboardWidgetSpans', JSON.stringify(spans));
+    localStorage.setItem('dashboardLayoutMode', layoutMode);
+    console.log('💾 Grid layout saved:', { layout, spans, layoutMode });
+  }
+  
+  function loadGridLayout() {
+    try {
+      const savedLayout = localStorage.getItem('dashboardGridLayout');
+      const savedSpans = localStorage.getItem('dashboardWidgetSpans');
+      const savedMode = localStorage.getItem('dashboardLayoutMode') || 'grid';
+      
+      const grid = document.getElementById('dashboard-grid');
+      const toggle = document.getElementById('layout-toggle');
+      
+      if (grid) {
+        grid.setAttribute('data-layout', savedMode);
+      }
+      
+      if (toggle) {
+        toggle.setAttribute('data-mode', savedMode);
+        const options = toggle.querySelectorAll('.toggle-option');
+        options.forEach(option => {
+          option.classList.toggle('active', option.getAttribute('data-mode') === savedMode);
+        });
+      }
+      
+      // Load positions
+      if (savedLayout) {
+        const layout = JSON.parse(savedLayout);
+        
+        layout.forEach((widgetType, position) => {
+          const widget = document.querySelector(`[data-widget="${widgetType}"]`);
+          if (widget) {
+            widget.setAttribute('data-position', position.toString());
+            widget.style.order = position;
+          }
+        });
+      }
+      
+      // Load spans
+      if (savedSpans) {
+        const spans = JSON.parse(savedSpans);
+        
+        Object.entries(spans).forEach(([widgetType, span]) => {
+          const widget = document.querySelector(`[data-widget="${widgetType}"]`);
+          if (widget) {
+            widget.setAttribute('data-span', span);
+            
+            // Update span button visual state
+            const btn = widget.querySelector('.span-toggle');
+            if (btn) {
+              btn.textContent = span === '2' ? '⤡' : '⤢';
+              btn.title = span === '2' ? 'Make single width' : 'Toggle full width';
+              btn.classList.toggle('active', span === '2');
+            }
+          }
+        });
+      }
+      
+      // Apply layout and span visibility
+      updateSpanButtonsVisibility(savedMode);
+      applyGridLayout();
+      
+      console.log('📐 Grid layout loaded:', { savedLayout, savedSpans, savedMode });
+    } catch (e) {
+      console.warn('Failed to load grid layout:', e);
+    }
   }
 
   function generateChart(stats, previousStats = null) {

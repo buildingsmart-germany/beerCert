@@ -25,10 +25,23 @@ html, body { height: 100%; }
 body {
   margin: 0;
   font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
-  background: radial-gradient(1200px 800px at 20% -10%, #1b1f2d 0%, #0f1115 55%), var(--bg);
+  background: var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(1200px 800px at 20% -10%, #1b1f2d 0%, #0f1115 55%);
+  z-index: -1;
+  pointer-events: none;
 }
 
 /* Accessible focus outline */
@@ -166,6 +179,13 @@ button:not(.choice):active { transform: translateY(0); box-shadow: 0 2px 8px var
 .dashboard {
   max-width: 1000px;
   margin: 0 auto;
+  padding: 0 16px;
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 0 12px;
+  }
 }
 
 .dashboard-header {
@@ -182,6 +202,31 @@ button:not(.choice):active { transform: translateY(0); box-shadow: 0 2px 8px var
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .dashboard-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  
+  .dashboard-title-section {
+    justify-content: center;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .dashboard-title-section h2 {
+    font-size: 20px;
+    margin: 0;
+    text-align: center;
+  }
+  
+  .dashboard-actions {
+    justify-content: center;
+  }
 }
 
 .backend-status {
@@ -317,6 +362,14 @@ button:not(.choice):active { transform: translateY(0); box-shadow: 0 2px 8px var
   margin-bottom: 40px;
 }
 
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+}
+
 .stat-card {
   background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
   border: 1px solid rgba(255,255,255,0.1);
@@ -364,11 +417,11 @@ button:not(.choice):active { transform: translateY(0); box-shadow: 0 2px 8px var
 }
 
 .chart-container {
-  background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
-  padding: 24px;
-  backdrop-filter: blur(8px);
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  backdrop-filter: none;
 }
 
 .chart-title {
@@ -651,14 +704,14 @@ button:not(.choice):active { transform: translateY(0); box-shadow: 0 2px 8px var
   to { transform: translateY(-8px); }
 }
 
-/* Progress Section Styles */
+/* Progress Section Styles - Updated for widget structure */
 .progress-section {
-  background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
-  padding: 24px;
-  margin-top: 24px;
-  backdrop-filter: blur(8px);
+  background: none;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  margin-top: 0;
+  backdrop-filter: none;
 }
 
 .progress-header {
@@ -816,6 +869,377 @@ button:not(.choice):active { transform: translateY(0); box-shadow: 0 2px 8px var
 @keyframes gentle-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.8; }
+}
+
+/* Layout Controls */
+.layout-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  gap: 20px;
+}
+
+.layout-toggle-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toggle-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.toggle-switch {
+  position: relative;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-track {
+  width: 140px;
+  height: 36px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 18px;
+  position: relative;
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: all 0.3s ease;
+}
+
+.toggle-thumb {
+  position: absolute;
+  width: 68px;
+  height: 32px;
+  background: var(--brand);
+  border-radius: 16px;
+  top: 2px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.toggle-switch[data-mode="grid"] .toggle-thumb {
+  left: 2px;
+}
+
+.toggle-switch[data-mode="stack"] .toggle-thumb {
+  left: 70px;
+}
+
+.toggle-options {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.toggle-option {
+  flex: 1;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  transition: color 0.3s ease;
+  padding: 0 8px;
+}
+
+.toggle-option.active {
+  color: #1f1f1f;
+}
+
+.toggle-switch:hover .toggle-track {
+  background: rgba(255,255,255,0.12);
+  border-color: rgba(255,255,255,0.2);
+}
+
+.layout-hint {
+  font-size: 12px;
+  color: var(--muted);
+  opacity: 0.8;
+  text-align: right;
+}
+
+/* Dashboard Grid System */
+.dashboard-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+}
+
+.dashboard-grid[data-layout="grid"] {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  grid-auto-flow: row;
+  grid-auto-rows: min-content;
+}
+
+/* Simple Drop Zones */
+.drop-zone {
+  min-height: 60px;
+  border: 2px dashed rgba(0,159,218,0.4);
+  border-radius: 12px;
+  background: rgba(0,159,218,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand);
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  margin: 8px 0;
+  opacity: 0.8;
+}
+
+.drop-zone.highlight {
+  border-color: var(--brand);
+  background: rgba(0,159,218,0.2);
+  box-shadow: 0 0 16px rgba(0,159,218,0.3);
+  transform: scale(1.02);
+  opacity: 1;
+}
+
+@media (max-width: 768px) {
+  .layout-controls {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+    padding: 12px 16px;
+  }
+  
+  .layout-toggle-container {
+    order: 1;
+  }
+  
+  .layout-hint {
+    order: 2;
+    font-size: 11px;
+  }
+  
+  .toggle-track {
+    width: 120px;
+    height: 32px;
+  }
+  
+  .toggle-thumb {
+    width: 58px;
+    height: 28px;
+  }
+  
+  .toggle-switch[data-mode="stack"] .toggle-thumb {
+    left: 60px;
+  }
+  
+  .dashboard-grid[data-layout="grid"] {
+    grid-template-columns: 1fr;
+  }
+  
+  .drop-zone {
+    min-height: 50px;
+    font-size: 12px;
+  }
+  
+  .span-toggle {
+    min-width: 24px;
+    height: 24px;
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+}
+
+.dashboard-widget {
+  background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 0;
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  z-index: 2;
+  width: 100%;
+}
+
+.dashboard-widget:hover {
+  border-color: rgba(255,255,255,0.12);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+
+.dashboard-widget.dragging {
+  transform: rotate(2deg) scale(1.03);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  z-index: 1000;
+  opacity: 0.95;
+  border-color: var(--brand);
+}
+
+.widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.02);
+  position: relative;
+}
+
+.widget-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.widget-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.widget-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.span-toggle {
+  background: rgba(255,255,255,0.08);
+  border: none;
+  color: var(--muted);
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  min-width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.span-toggle:hover {
+  background: rgba(255,255,255,0.12);
+  color: var(--text);
+  transform: scale(1.1);
+}
+
+.span-toggle.active {
+  background: var(--brand);
+  color: #1f1f1f;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0,159,218,0.3);
+}
+
+.drag-handle {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: grab;
+  padding: 4px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+  transition: all 0.2s ease;
+  opacity: 0.6;
+}
+
+.drag-handle:hover {
+  color: var(--brand);
+  background: rgba(255,255,255,0.05);
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Update existing containers to work with new widget structure */
+.dashboard-widget .stats-grid {
+  padding: 20px;
+  margin-bottom: 0;
+}
+
+.dashboard-widget .chart-container {
+  padding: 20px;
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+
+.dashboard-widget .progress-chart {
+  padding: 20px;
+}
+
+.dashboard-widget .chart-title {
+  margin: 0 0 20px 0;
+}
+
+/* Mobile optimizations for widgets and grid */
+@media (max-width: 768px) {
+  .dashboard-grid {
+    gap: 16px;
+  }
+  
+  .widget-header {
+    padding: 12px 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .widget-title {
+    font-size: 13px;
+  }
+  
+  .widget-header-controls {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  
+  .limit-settings {
+    order: -1;
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .drag-handle {
+    font-size: 12px;
+    padding: 6px;
+  }
+  
+  .dashboard-widget .stats-grid {
+    padding: 16px;
+  }
+  
+  .dashboard-widget .chart-container {
+    padding: 16px;
+  }
+  
+  .dashboard-widget .progress-chart {
+    padding: 16px;
+  }
+  
+  .drop-zone.active::after {
+    font-size: 12px;
+  }
 }
 
 
